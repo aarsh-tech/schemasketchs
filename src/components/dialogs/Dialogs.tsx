@@ -1,14 +1,18 @@
-import { Copy, Download, History, LoaderCircle, RotateCcw, Tag } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { ArrowRight, ArrowRightLeft, Copy, Download, GitCompareArrows, History, LoaderCircle, Minus, Pencil, Plus, RotateCcw, Tag, TriangleAlert } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import { copyText, downloadCode, errorText, generateCode, importSql, openProjectFile, restoreVersion, saveVersion } from '@/lib/actions'
-import type { ImportDialect, SqlDialect } from '@/lib/dbml/types'
-import { baseName, clearShareHash } from '@/lib/files'
+import { parseDbml } from '@/lib/dbml/client'
+import type { ImportDialect, ParseDiagnostic, SchemaModel, SqlDialect } from '@/lib/dbml/types'
+import type { ChangeKind, MigrationDialect, SummaryItem } from '@/lib/diff'
+import { baseName, clearShareHash, downloadText, slug } from '@/lib/files'
 import { IDLE_MS, deleteVersions, describeDelta, tableDelta } from '@/lib/history'
+import type { Version } from '@/lib/history'
 import { useHistory } from '@/store/history'
 import { useDialogs } from '@/store/dialogs'
 import { useProjects } from '@/store/projects'
-import { Button, Dialog, Kbd, Segmented } from '@/components/ui/primitives'
+import { useUi } from '@/store/ui'
+import { Button, Dialog, IconButton, Kbd, Segmented } from '@/components/ui/primitives'
 import { cx } from '@/lib/cx'
 
 export function Dialogs() {
@@ -26,6 +30,7 @@ export function Dialogs() {
       <SharedLinkDialog dialog={dialog?.type === 'shared-link' ? dialog : null} onClose={close} />
       <ShareDialog url={dialog?.type === 'share' ? dialog.url : null} onClose={close} />
       <HistoryDialog open={dialog?.type === 'history'} onClose={close} />
+      <MigrationDialog dialog={dialog?.type === 'migration' ? dialog : null} onClose={close} />
     </>
   )
 }
@@ -513,6 +518,14 @@ function HistoryBody({ onClose }: { onClose: () => void }) {
                   </div>
                 </div>
                 <Button
+                  variant="outline"
+                  disabled={selected.source === current}
+                  title={selected.source === current ? 'This is what the editor has now' : 'See the SQL that turns this version into the current schema'}
+                  onClick={() => useDialogs.getState().open({ type: 'migration', from: `v:${selected.id}`, to: 'current' })}
+                >
+                  <GitCompareArrows size={14} /> Compare with current
+                </Button>
+                <Button
                   variant="primary"
                   disabled={selected.source === current}
                   title={selected.source === current ? 'This is what the editor has now' : undefined}
@@ -532,6 +545,254 @@ function HistoryBody({ onClose }: { onClose: () => void }) {
               </pre>
             </div>
           ) : null}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* ---------- migration generator ---------- */
+
+/** 'current', 'pasted' or 'v:<version id>' */
+type Side = string
+
+type Parsed = { model: SchemaModel | null; diagnostics: ParseDiagnostic[] }
+
+function sideLabel(side: Side, versions: Version[]): string {
+  if (side === 'current') return 'Current schema'
+  if (side === 'pasted') return 'Pasted DBML'
+  const v = versions.find((x) => `v:${x.id}` === side)
+  return v ? (v.label ?? `Snapshot from ${formatWhen(v.createdAt)}`) : 'Missing version'
+}
+
+function MigrationDialog({ dialog, onClose }: { dialog: { from?: Side; to?: Side } | null; onClose: () => void }) {
+  return (
+    <Dialog
+      open={!!dialog}
+      onClose={onClose}
+      width={1000}
+      title="Generate migration"
+      description="Compare two versions of this schema and get the SQL that turns one into the other. Nothing leaves your browser."
+    >
+      {dialog ? <MigrationBody key={`${dialog.from ?? ''}>${dialog.to ?? ''}`} initialFrom={dialog.from} initialTo={dialog.to} /> : null}
+    </Dialog>
+  )
+}
+
+const KIND_ICON: Record<ChangeKind, { icon: typeof Plus; className: string; label: string }> = {
+  add: { icon: Plus, className: 'text-accent', label: 'Added' },
+  remove: { icon: Minus, className: 'text-danger', label: 'Removed' },
+  change: { icon: Pencil, className: 'text-ref', label: 'Changed' },
+  rename: { icon: ArrowRight, className: 'text-ref', label: 'Renamed' },
+}
+
+function MigrationBody({ initialFrom, initialTo }: { initialFrom?: Side; initialTo?: Side }) {
+  const versions = useHistory((s) => s.versions)
+  const project = useProjects((s) => s.projects[s.activeId])
+  const current = project?.source ?? ''
+  const [from, setFrom] = useState<Side>(() => {
+    if (initialFrom) return initialFrom
+    // the newest version that differs from what's in the editor, if there is one
+    const older = versions.find((v) => v.source !== current)
+    return older ? `v:${older.id}` : 'pasted'
+  })
+  const [to, setTo] = useState<Side>(initialTo ?? 'current')
+  const [pasted, setPasted] = useState('')
+  const [dialect, setDialect] = useState<MigrationDialect>(() => (/mysql/i.test(useUi.getState().model.databaseType ?? '') ? 'mysql' : 'postgres'))
+  const [direction, setDirection] = useState<'up' | 'down'>('up')
+  const [detectRenames, setDetectRenames] = useState(true)
+
+  const sourceOf = (side: Side) => (side === 'current' ? current : side === 'pasted' ? pasted : (versions.find((v) => `v:${v.id}` === side)?.source ?? ''))
+  const fromSource = sourceOf(from)
+  const toSource = sourceOf(to)
+
+  const [result, setResult] = useState<{ fromSource: string; toSource: string; mod: typeof import('@/lib/diff') | null; a: Parsed; b: Parsed } | null>(null)
+  const loading = result?.fromSource !== fromSource || result?.toSource !== toSource
+
+  useEffect(() => {
+    let cancelled = false
+    // short pause so typing in the paste box doesn't parse on every key
+    const t = setTimeout(() => {
+      Promise.all([import('@/lib/diff'), parseDbml(fromSource), parseDbml(toSource)]).then(
+        ([mod, a, b]) => !cancelled && setResult({ fromSource, toSource, mod, a, b }),
+        (err) => {
+          const failed: Parsed = { model: null, diagnostics: [{ message: errorText(err), line: 1, column: 1, endLine: 1, endColumn: 2 }] }
+          if (!cancelled) setResult({ fromSource, toSource, mod: null, a: failed, b: failed })
+        },
+      )
+    }, 200)
+    return () => {
+      cancelled = true
+      clearTimeout(t)
+    }
+  }, [fromSource, toSource])
+
+  const title = `${sideLabel(from, versions)} → ${sideLabel(to, versions)}`
+  const migration = useMemo(() => {
+    if (!result?.mod || !result.a.model || !result.b.model) return null
+    return result.mod.generateMigration(result.a.model, result.b.model, dialect, { detectRenames, title })
+  }, [result, dialect, detectRenames, title])
+  const summary = useMemo<SummaryItem[]>(() => (migration && result?.mod ? result.mod.summarize(migration.diff) : []), [migration, result])
+
+  const parseError = (() => {
+    if (!result) return null
+    for (const [side, parsed] of [[from, result.a], [to, result.b]] as const) {
+      const d = parsed.diagnostics[0]
+      if (!parsed.model && d) return `${sideLabel(side, versions)} has an error on line ${d.line}: ${d.message}. Fix it before comparing.`
+    }
+    return null
+  })()
+  const needsPaste = (from === 'pasted' || to === 'pasted') && !pasted.trim()
+  const sql = migration?.[direction] ?? ''
+  const destructive = summary.filter((s) => s.risk === 'destructive').length
+  const fileName = `${slug(project?.name ?? 'schema')}-${direction}.${dialect}.sql`
+
+  const sidePicker = (id: string, label: string, value: Side, onChange: (s: Side) => void) => (
+    <div className="flex min-w-0 flex-1 flex-col gap-1">
+      <label htmlFor={id} className="text-[12px] font-medium text-ink-2">
+        {label}
+      </label>
+      <select id={id} value={value} onChange={(e) => onChange(e.target.value)} className="h-8 w-full min-w-0 rounded-md border border-line-strong bg-raised px-2 text-[13px]">
+        <option value="current">Current schema</option>
+        <option value="pasted">Pasted DBML</option>
+        {versions.length ? (
+          <optgroup label="Saved versions">
+            {versions.map((v) => (
+              <option key={v.id} value={`v:${v.id}`}>
+                {v.label ? `${v.label} · ${formatWhen(v.createdAt)}` : `Snapshot · ${formatWhen(v.createdAt)}`}
+              </option>
+            ))}
+          </optgroup>
+        ) : null}
+      </select>
+    </div>
+  )
+
+  return (
+    <div className="grid gap-3">
+      <div className="flex items-end gap-2">
+        {sidePicker('migration-from', 'From (before)', from, setFrom)}
+        <IconButton
+          label="Swap before and after"
+          onClick={() => {
+            setFrom(to)
+            setTo(from)
+          }}
+        >
+          <ArrowRightLeft size={15} />
+        </IconButton>
+        {sidePicker('migration-to', 'To (after)', to, setTo)}
+      </div>
+
+      {from === 'pasted' || to === 'pasted' ? (
+        <div>
+          <label htmlFor="migration-paste" className="sr-only">
+            DBML to compare
+          </label>
+          <textarea
+            id="migration-paste"
+            value={pasted}
+            onChange={(e) => setPasted(e.target.value)}
+            spellCheck={false}
+            placeholder={'Paste DBML here, e.g. the schema from your main branch\n\nTable users {\n  id integer [pk]\n}'}
+            className="h-32 w-full resize-y rounded-lg border border-line-strong bg-panel p-3 font-mono text-[12.5px] leading-relaxed outline-none focus:border-accent"
+          />
+        </div>
+      ) : null}
+
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <Segmented
+          label="SQL dialect"
+          value={dialect}
+          onChange={setDialect}
+          options={[
+            { value: 'postgres', label: 'PostgreSQL' },
+            { value: 'mysql', label: 'MySQL' },
+          ]}
+        />
+        <label className="flex items-center gap-1.5 text-[12.5px] text-ink-2" title="Treat a dropped table and a new table with mostly the same columns as one renamed table">
+          <input type="checkbox" checked={detectRenames} onChange={(e) => setDetectRenames(e.target.checked)} className="h-3.5 w-3.5 accent-accent" />
+          Detect renamed tables
+        </label>
+      </div>
+
+      {parseError ? (
+        <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-[12.5px] text-danger">
+          {parseError}
+        </p>
+      ) : needsPaste ? (
+        <div className="rounded-lg border border-dashed border-line-strong px-4 py-6 text-center text-[12.5px] text-ink-2">Paste some DBML above to compare against it.</div>
+      ) : !migration ? (
+        <p className="flex items-center gap-2 text-[13px] text-ink-2">
+          <LoaderCircle size={14} className="animate-spin" /> Comparing…
+        </p>
+      ) : (
+        <div className={cx('grid gap-3', loading && 'opacity-60')}>
+          <section aria-label="Changes" className="rounded-lg border border-line">
+            <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2">
+              <h3 className="text-[13px] font-semibold">{summary.length ? `${summary.length} ${summary.length === 1 ? 'change' : 'changes'}` : 'No differences'}</h3>
+              {destructive ? (
+                <span className="inline-flex items-center gap-1 rounded bg-danger-soft px-1.5 py-px text-[11.5px] font-medium text-danger">
+                  <TriangleAlert size={11} /> {destructive} can lose data
+                </span>
+              ) : null}
+            </div>
+            {summary.length ? (
+              <ul className="max-h-[24vh] overflow-y-auto p-1 scrollbar-thin">
+                {summary.map((item, i) => {
+                  const k = KIND_ICON[item.kind]
+                  return (
+                    <li key={i} className="flex items-start gap-2 rounded-md px-2 py-1 text-[12.5px]">
+                      <k.icon size={13} className={cx('mt-0.5 shrink-0', k.className)} aria-label={k.label} />
+                      <div className="min-w-0 flex-1">
+                        <span className="font-mono text-[12px] break-all text-ink">{item.subject}</span> <span className="text-ink-2">{item.text}</span>
+                        {item.note ? <div className={cx('text-[11.5px]', item.risk === 'destructive' ? 'text-danger' : 'text-key')}>{item.note}</div> : null}
+                      </div>
+                      {item.risk ? (
+                        <span
+                          className={cx(
+                            'shrink-0 rounded px-1.5 py-px text-[11px] font-medium',
+                            item.risk === 'destructive' ? 'bg-danger-soft text-danger' : 'border border-line-strong text-key',
+                          )}
+                        >
+                          {item.risk === 'destructive' ? 'Data loss' : 'Check'}
+                        </span>
+                      ) : null}
+                    </li>
+                  )
+                })}
+              </ul>
+            ) : (
+              <p className="px-3 py-3 text-[12.5px] text-ink-2">Both sides have the same tables, columns, indexes, enums and relationships.</p>
+            )}
+          </section>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <Segmented
+              label="Script"
+              value={direction}
+              onChange={setDirection}
+              options={[
+                { value: 'up', label: 'Up', title: 'Before → after' },
+                { value: 'down', label: 'Down', title: 'After → before, to undo it' },
+              ]}
+            />
+            <span className="hidden text-[12px] text-ink-3 sm:inline">{direction === 'up' ? 'Applies the change' : 'Undoes the change'}</span>
+            <div className="flex-1" />
+            <Button variant="outline" disabled={!sql} onClick={() => copyText(sql, 'SQL copied')}>
+              <Copy size={14} /> Copy
+            </Button>
+            <Button variant="primary" disabled={!sql} onClick={() => downloadText(sql, fileName, 'application/sql')}>
+              <Download size={14} /> Download .sql
+            </Button>
+          </div>
+          <pre
+            aria-label={`${direction === 'up' ? 'Up' : 'Down'} migration SQL`}
+            tabIndex={0}
+            className="h-[40vh] overflow-auto rounded-lg border border-line bg-panel p-3 font-mono text-[12px] leading-relaxed text-ink scrollbar-thin"
+          >
+            {sql}
+          </pre>
         </div>
       )}
     </div>

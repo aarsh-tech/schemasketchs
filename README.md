@@ -17,6 +17,7 @@ Planned features are listed in [ROADMAP.md](ROADMAP.md). Contributions are welco
 - **Column views**: all columns, keys only, or table names only
 - **Multiple schemas**: create, rename, duplicate and delete, all kept in this browser
 - **Version history**: a snapshot is taken after 30 seconds without edits, or save one by hand with a label. Browse versions with their time and table-count change, preview the code read-only, and restore both the code and the layout. Stored in IndexedDB: up to 100 automatic snapshots per schema, and labelled ones are never removed
+- **Migration generator**: compare two saved versions, a version and the current schema, or pasted DBML, and get a readable change summary plus up and down `ALTER` scripts for PostgreSQL or MySQL. Renamed tables are detected, and destructive steps (dropping a table, column or enum value) carry warning comments. Copy or download the SQL. Open it from File → Generate migration, or with "Compare with current" in the version history
 - **Files**: open/save `.dbml` or project `.json` (schema + layout). On Chrome and Edge, saving writes straight back to the file you opened
 - **Import SQL**: PostgreSQL, MySQL, SQL Server, Snowflake, Oracle and Rails `schema.rb`
 - **Export**: PNG, SVG, SQL (PostgreSQL, MySQL, SQL Server, Oracle), DBML, project JSON
@@ -87,6 +88,7 @@ src/
     editor/           CodeMirror 6 + a DBML stream language, linting and autocomplete
     canvas/           React Flow nodes, crow's-foot edges, ELK auto-layout
     dialogs/          import, export, share, help
+  lib/diff/           schema diff → change summary and up/down migration SQL (pure functions, lazy-loaded)
   lib/files.ts        File System Access API with download fallbacks, share-link encoding
 ```
 

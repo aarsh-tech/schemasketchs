@@ -7,6 +7,7 @@ import {
   FileCode,
   FilePlus,
   FolderOpen,
+  GitCompareArrows,
   History,
   Image,
   Monitor,
@@ -156,6 +157,7 @@ export function TopBar() {
     'separator',
     { label: 'Save version…', icon: <Tag size={14} />, onSelect: () => useDialogs.getState().open({ type: 'history' }) },
     { label: 'Version history…', icon: <History size={14} />, onSelect: () => useDialogs.getState().open({ type: 'history' }) },
+    { label: 'Generate migration…', icon: <GitCompareArrows size={14} />, onSelect: () => useDialogs.getState().open({ type: 'migration' }) },
     'separator',
     { label: 'Import from SQL…', icon: <Upload size={14} />, onSelect: () => useDialogs.getState().open({ type: 'import-sql' }) },
   ]

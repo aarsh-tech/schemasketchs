@@ -3,6 +3,7 @@ import type {
   EnumModel,
   FieldModel,
   GroupModel,
+  IndexModel,
   ParseDiagnostic,
   RefModel,
   SchemaModel,
@@ -61,6 +62,8 @@ interface NormalizedLike {
   enums?: Dict<{ id: number; name: string; valueIds: number[]; schemaId: number }>
   enumValues?: Dict<{ name: string }>
   notes?: Dict<{ id: number; name: string; content: string; color?: string | null; metadata?: { headercolor?: string } }>
+  indexes?: Dict<{ name?: string | null; type?: string | null; unique?: boolean; pk?: boolean; columnIds?: number[] }>
+  indexColumns?: Dict<{ type: string; value: string }>
 }
 
 const DEFAULT_SCHEMA = 'public'
@@ -92,6 +95,16 @@ function formatType(t: NField['type']): string {
 }
 
 export function toSchemaModel(n: NormalizedLike): SchemaModel {
+  const toIndex = (i: NonNullable<NormalizedLike['indexes']>[number]): IndexModel => ({
+    name: i.name ?? null,
+    columns: (i.columnIds ?? [])
+      .map((cid) => n.indexColumns?.[cid])
+      .filter((c) => !!c)
+      .map((c) => (c.type === 'expression' ? `\`${c.value}\`` : c.value)),
+    unique: !!i.unique,
+    pk: !!i.pk,
+    type: i.type ?? null,
+  })
   const schemas = n.schemas ?? {}
   const fields = n.fields ?? {}
   const db = Object.values(n.database ?? {})[0]
@@ -142,6 +155,10 @@ export function toSchemaModel(n: NormalizedLike): SchemaModel {
       groupId: t.groupId != null ? groupKey(t.groupId) : null,
       fields: tableFields,
       indexCount: t.indexIds?.length ?? 0,
+      indexes: (t.indexIds ?? [])
+        .map((iid) => n.indexes?.[iid])
+        .filter((i) => !!i)
+        .map(toIndex),
     }
   })
 
