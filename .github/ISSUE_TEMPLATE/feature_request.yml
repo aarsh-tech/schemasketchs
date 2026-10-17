@@ -1,0 +1,23 @@
+name: Feature request
+description: Suggest something Schemasketch could do
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: Schemasketch runs entirely in the browser with no backend, so ideas that need a server of ours are out of scope. Check ROADMAP.md first; it may already be planned.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What you're trying to do
+      description: The problem or task, rather than a particular solution.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: How it could work
+      description: What you'd click or type, and what you'd get.
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What you do today instead

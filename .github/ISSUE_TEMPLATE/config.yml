@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: DBML syntax questions
+    url: https://dbml.dbdiagram.io/docs
+    about: How to write tables, refs, enums and notes in DBML.

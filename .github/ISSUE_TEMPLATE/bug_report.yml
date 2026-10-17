@@ -1,0 +1,40 @@
+name: Bug report
+description: Something in Schemasketch doesn't work as it should
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for reporting this. The smaller the schema that shows the problem, the faster it gets fixed.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: dbml
+    attributes:
+      label: DBML that shows it
+      description: The smallest schema that reproduces the problem. A share link (Share → Copy link) also works; it carries the schema and layout.
+      render: dbml
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Paste the DBML above
+        2. Right-click the users table and choose Rename
+        3. …
+  - type: input
+    id: browser
+    attributes:
+      label: Browser and system
+      placeholder: Chrome 140 on Windows 11, Safari on iPhone…
+    validations:
+      required: true
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else
+      description: Screenshots, errors from the browser console, or whether it happens in light and dark, or only at phone width.

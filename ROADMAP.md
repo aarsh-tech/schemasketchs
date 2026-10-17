@@ -111,5 +111,5 @@ Today the diagram only reflects the code. Make edits on the canvas write back in
 ## Housekeeping (anytime)
 
 - [x] Vitest set up with a `pnpm test` script, run in CI
-- [ ] Screenshots and a GIF in the README
-- [ ] CONTRIBUTING.md and issue templates
+- [x] Screenshots and a GIF in the README
+- [x] CONTRIBUTING.md and issue templates

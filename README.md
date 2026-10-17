@@ -2,9 +2,15 @@
 
 Draw database diagrams by writing [DBML](https://dbml.dbdiagram.io/docs). A free, local alternative to dbdiagram.io: no account, no backend, no database. Everything runs in the browser and your schemas are saved in `localStorage`.
 
+![Typing DBML in the editor while the diagram draws itself](docs/demo.gif)
+
+| Light | Dark, hovering a table |
+| --- | --- |
+| ![The Bookshop sample schema in the light theme](docs/screenshot-light.png) | ![The same schema in the dark theme, with the orders table's relationships highlighted](docs/screenshot-dark.png) |
+
 ## Roadmap
 
-Planned features are listed in [ROADMAP.md](ROADMAP.md). Contributions are welcome.
+Planned features are listed in [ROADMAP.md](ROADMAP.md). Contributions are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Features
 

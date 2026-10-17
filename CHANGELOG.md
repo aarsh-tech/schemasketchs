@@ -51,3 +51,6 @@ Export → Seed data makes realistic `INSERT` statements for PostgreSQL, MySQL, 
 ## Embed mode (#14)
 `/embed#s=…` shows a read-only diagram to pan and zoom, with hover highlighting, a theme from `?theme=` or the reader's system, and a link to open a copy; the Share dialog has an Embed tab with the `<iframe>` code and a live preview. It's a second Vite entry (`embed.html`) that loads React, React Flow and the parser only, about 5 KB of its own code.
 To keep the embed small, the plain table, note and group views moved to `canvas/parts.tsx`, and deleting a relationship is passed to the edges through context. `X-Frame-Options: DENY` now applies to the app page only, so `/embed` can be framed.
+
+## Housekeeping
+The README opens with a demo GIF (typing DBML into an empty schema while the diagram draws itself) and light and dark screenshots, in `docs/`. Added CONTRIBUTING.md (setup, architecture rules, UI conventions, testing and pull request expectations), bug and feature issue forms, and a pull request checklist.
