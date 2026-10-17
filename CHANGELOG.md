@@ -14,4 +14,4 @@ The diff lives in `src/lib/diff/` as pure, lazy-loaded functions (tables with re
 
 ## ORM import and export (#4)
 Import a Prisma schema or a Drizzle schema file (pg-core, mysql-core or sqlite-core) into DBML, and export the schema as Prisma, Drizzle, TypeScript interfaces or Zod 4 schemas, from new tabs in the Import and Export dialogs. Dropped `.prisma` and `.ts` files open the right tab, and anything a format can't hold is listed in a comment instead of being dropped silently.
-The converters live in `src/lib/convert/` as pure, lazy-loaded functions with 93 new Vitest tests: every fixture round-trips through both ORMs, Prisma output passes Prisma's own validator, and the generated TypeScript compiles against the real `drizzle-orm` and `zod`.
+The converters live in `src/lib/convert/` as pure, lazy-loaded functions with 52 new Vitest tests: every fixture round-trips through both ORMs, Prisma output passes Prisma's own validator, and the generated TypeScript compiles against the real `drizzle-orm` and `zod`.
