@@ -8,6 +8,7 @@ export type DialogState =
   | { type: 'delete-project'; projectId: string }
   | { type: 'shared-link'; file: ProjectFile }
   | { type: 'share'; url: string }
+  | { type: 'history' }
   | null
 
 export const useDialogs = create<{ dialog: DialogState; open: (d: DialogState) => void; close: () => void }>((set) => ({

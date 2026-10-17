@@ -31,6 +31,8 @@ interface UiState {
   fitRequest: number
   /** bumped when the source is replaced from outside the editor (import, open) */
   editorEpoch: number
+  /** bumped when saved positions are replaced (restoring a version), so the canvas re-reads them */
+  canvasEpoch: number
 
   setTheme: (t: ThemePref) => void
   setDetail: (d: DetailLevel) => void
@@ -45,6 +47,7 @@ interface UiState {
   requestLayout: () => void
   requestFit: () => void
   bumpEditor: () => void
+  bumpCanvas: () => void
 }
 
 export const useUi = create<UiState>()(
@@ -66,6 +69,7 @@ export const useUi = create<UiState>()(
       layoutRequest: 0,
       fitRequest: 0,
       editorEpoch: 0,
+      canvasEpoch: 0,
 
       setTheme: (theme) => set({ theme }),
       setDetail: (detail) => set({ detail }),
@@ -87,6 +91,7 @@ export const useUi = create<UiState>()(
       requestLayout: () => set((s) => ({ layoutRequest: s.layoutRequest + 1 })),
       requestFit: () => set((s) => ({ fitRequest: s.fitRequest + 1 })),
       bumpEditor: () => set((s) => ({ editorEpoch: s.editorEpoch + 1 })),
+      bumpCanvas: () => set((s) => ({ canvasEpoch: s.canvasEpoch + 1 })),
     }),
     {
       name: 'schemasketch:ui',

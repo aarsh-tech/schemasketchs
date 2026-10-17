@@ -1,8 +1,11 @@
-import { Copy, Download, LoaderCircle } from 'lucide-react'
+import { Copy, Download, History, LoaderCircle, RotateCcw, Tag } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { copyText, downloadCode, errorText, generateCode, importSql, openProjectFile } from '@/lib/actions'
+import type { FormEvent } from 'react'
+import { copyText, downloadCode, errorText, generateCode, importSql, openProjectFile, restoreVersion, saveVersion } from '@/lib/actions'
 import type { ImportDialect, SqlDialect } from '@/lib/dbml/types'
 import { baseName, clearShareHash } from '@/lib/files'
+import { IDLE_MS, deleteVersions, describeDelta, tableDelta } from '@/lib/history'
+import { useHistory } from '@/store/history'
 import { useDialogs } from '@/store/dialogs'
 import { useProjects } from '@/store/projects'
 import { Button, Dialog, Kbd, Segmented } from '@/components/ui/primitives'
@@ -22,6 +25,7 @@ export function Dialogs() {
       <DeleteProjectDialog projectId={dialog?.type === 'delete-project' ? dialog.projectId : null} onClose={close} />
       <SharedLinkDialog dialog={dialog?.type === 'shared-link' ? dialog : null} onClose={close} />
       <ShareDialog url={dialog?.type === 'share' ? dialog.url : null} onClose={close} />
+      <HistoryDialog open={dialog?.type === 'history'} onClose={close} />
     </>
   )
 }
@@ -314,7 +318,10 @@ function DeleteProjectDialog({ projectId, onClose }: { projectId: string | null;
             variant="danger"
             autoFocus
             onClick={() => {
-              if (projectId) useProjects.getState().deleteProject(projectId)
+              if (projectId) {
+                useProjects.getState().deleteProject(projectId)
+                void deleteVersions(projectId)
+              }
               onClose()
             }}
           >
@@ -392,5 +399,141 @@ function ShareDialog({ url, onClose }: { url: string | null; onClose: () => void
         </p>
       ) : null}
     </Dialog>
+  )
+}
+
+/* ---------- version history ---------- */
+
+function formatWhen(t: number): string {
+  const d = new Date(t)
+  const now = new Date()
+  const time = d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+  const dayDiff = Math.round((new Date(now.toDateString()).getTime() - new Date(d.toDateString()).getTime()) / 86_400_000)
+  if (dayDiff === 0) return `Today, ${time}`
+  if (dayDiff === 1) return `Yesterday, ${time}`
+  const date = d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', ...(d.getFullYear() !== now.getFullYear() ? { year: 'numeric' } : {}) })
+  return `${date}, ${time}`
+}
+
+function HistoryDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      width={940}
+      title="Version history"
+      description={`A snapshot is taken after ${IDLE_MS / 1000} seconds without edits and kept in this browser. Labelled versions are never removed.`}
+    >
+      <HistoryBody onClose={onClose} />
+    </Dialog>
+  )
+}
+
+function HistoryBody({ onClose }: { onClose: () => void }) {
+  const versions = useHistory((s) => s.versions)
+  const loading = useHistory((s) => s.loading)
+  const current = useProjects((s) => s.projects[s.activeId]?.source ?? '')
+  const [picked, setPicked] = useState<string | null>(null)
+  const [label, setLabel] = useState('')
+  const [saving, setSaving] = useState(false)
+  const index = Math.max(0, versions.findIndex((v) => v.id === picked))
+  const selected = versions[index] ?? null
+
+  const save = async (e: FormEvent) => {
+    e.preventDefault()
+    setSaving(true)
+    await saveVersion(label)
+    setSaving(false)
+    setLabel('')
+    setPicked(null)
+  }
+
+  return (
+    <div className="grid gap-4">
+      <form onSubmit={save} className="flex flex-wrap items-center gap-2">
+        <label htmlFor="version-label" className="sr-only">
+          Label for this version
+        </label>
+        <input
+          id="version-label"
+          value={label}
+          onChange={(e) => setLabel(e.target.value)}
+          maxLength={80}
+          placeholder="Label, e.g. Before billing changes (optional)"
+          className="h-8 min-w-0 flex-1 rounded-md border border-line-strong bg-panel px-2.5 text-[13px] outline-none focus:border-accent"
+        />
+        <Button type="submit" variant="outline" disabled={saving}>
+          {saving ? <LoaderCircle size={14} className="animate-spin" /> : <Tag size={14} />}
+          Save version
+        </Button>
+      </form>
+
+      {loading ? (
+        <p className="text-[13px] text-ink-2">Loading versions…</p>
+      ) : versions.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-line-strong px-4 py-8 text-center">
+          <History size={20} className="mx-auto text-ink-3" />
+          <p className="mt-2 text-[13.5px] font-medium">No versions yet</p>
+          <p className="mt-1 text-[12.5px] text-ink-2">Keep editing and one is saved when you pause, or save one now with a label.</p>
+        </div>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-[280px_1fr]">
+          <ol className="max-h-[28vh] overflow-y-auto rounded-lg border border-line p-1 scrollbar-thin md:max-h-[56vh]" aria-label="Versions, newest first">
+            {versions.map((v, i) => (
+              <li key={v.id}>
+                <button
+                  type="button"
+                  aria-current={v === selected}
+                  onClick={() => setPicked(v.id)}
+                  className={cx(
+                    'flex w-full flex-col items-start gap-0.5 rounded-md px-2.5 py-2 text-left',
+                    v === selected ? 'bg-accent-soft' : 'hover:bg-hover',
+                  )}
+                >
+                  <span className="flex w-full items-baseline gap-2">
+                    <span className="truncate text-[13px] font-medium">{v.label ?? 'Automatic snapshot'}</span>
+                    {v.label ? <Tag size={11} className="shrink-0 text-key" aria-label="labelled" /> : null}
+                  </span>
+                  <span className="flex w-full justify-between gap-2 text-[11.5px] text-ink-2">
+                    <span>{formatWhen(v.createdAt)}</span>
+                    <span className="font-mono text-ink-3">{describeDelta(tableDelta(versions, i))}</span>
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ol>
+          {selected ? (
+            <div className="flex min-w-0 flex-col gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-[13.5px] font-semibold">{selected.label ?? 'Automatic snapshot'}</div>
+                  <div className="text-[12px] text-ink-2">
+                    {formatWhen(selected.createdAt)} · {selected.tableCount} {selected.tableCount === 1 ? 'table' : 'tables'} ·{' '}
+                    {selected.source.split('\n').length} lines
+                  </div>
+                </div>
+                <Button
+                  variant="primary"
+                  disabled={selected.source === current}
+                  title={selected.source === current ? 'This is what the editor has now' : undefined}
+                  onClick={() => {
+                    void restoreVersion(selected)
+                    onClose()
+                  }}
+                >
+                  <RotateCcw size={14} /> {selected.source === current ? 'Same as now' : 'Restore this version'}
+                </Button>
+              </div>
+              <pre
+                aria-label="Read-only preview of this version"
+                className="h-[40vh] overflow-auto rounded-lg border border-line bg-panel p-3 font-mono text-[12px] leading-relaxed text-ink scrollbar-thin md:h-[50vh]"
+              >
+                {selected.source}
+              </pre>
+            </div>
+          ) : null}
+        </div>
+      )}
+    </div>
   )
 }

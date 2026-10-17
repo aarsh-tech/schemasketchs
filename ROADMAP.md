@@ -19,7 +19,7 @@ Today the diagram only reflects the code. Make edits on the canvas write back in
 - Unit tests for `edit.ts` with Vitest (add it as a dev dependency).
 - Done when every edit updates the code, the editor shows the change, and undo in the editor (Ctrl+Z) reverses it.
 
-### - [ ] 2. Version history
+### - [x] 2. Version history
 - Take an automatic snapshot of a project's source after editing stops for 30 seconds, plus a manual "Save version" with an optional label.
 - A history panel lists versions with time, label and table-count change. You can preview a version read-only and restore it.
 - Store snapshots in IndexedDB (use `idb-keyval`), not localStorage. Cap automatic snapshots at 100 per project and never delete labelled ones.

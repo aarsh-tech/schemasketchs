@@ -41,6 +41,7 @@ export function DiagramCanvas() {
   const layoutRequest = useUi((s) => s.layoutRequest)
   const fitRequest = useUi((s) => s.fitRequest)
   const epoch = useUi((s) => s.editorEpoch)
+  const canvasEpoch = useUi((s) => s.canvasEpoch)
 
   const [nodes, setNodes] = useState<AnyNode[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -59,7 +60,7 @@ export function DiagramCanvas() {
   /* ---- model → nodes ---- */
   useEffect(() => {
     if (modelProjectId !== activeId) return
-    const buildKey = `${activeId}:${epoch}`
+    const buildKey = `${activeId}:${epoch}:${canvasEpoch}`
     const switched = builtFor.current !== buildKey
     builtFor.current = buildKey
     const positions = useProjects.getState().projects[activeId]?.positions ?? {}
@@ -83,7 +84,7 @@ export function DiagramCanvas() {
       return next
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [model, detail, activeId, modelProjectId, epoch])
+  }, [model, detail, activeId, modelProjectId, epoch, canvasEpoch])
 
   function viewportCenter(): XY {
     const el = wrapper.current

@@ -6,10 +6,12 @@ import { Workspace } from '@/components/Workspace'
 import { useFileDrop, useIncomingShare, useShortcuts } from '@/hooks/useAppEvents'
 import { useSchemaSync } from '@/hooks/useSchemaSync'
 import { useApplyTheme } from '@/hooks/useTheme'
+import { useVersionHistory } from '@/hooks/useVersionHistory'
 
 export default function App() {
   const theme = useApplyTheme()
   useSchemaSync()
+  useVersionHistory()
   useShortcuts()
   useIncomingShare()
   const dragging = useFileDrop()
