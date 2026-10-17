@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { SAMPLE_DBML } from '@/lib/sample'
-import { guessKind, guessTextKind } from './files'
+import { embedCode, guessKind, guessTextKind } from './files'
 
 describe('guessKind', () => {
   it('goes by the extension first', () => {
@@ -27,5 +27,15 @@ describe('guessTextKind', () => {
     expect(guessTextKind('ActiveRecord::Schema[7.1].define(version: 1) do')).toBe('sql')
     expect(guessTextKind(SAMPLE_DBML)).toBeNull()
     expect(guessTextKind('Table model { id int }')).toBeNull()
+  })
+})
+
+describe('embedCode', () => {
+  it('points an iframe at /embed with the same hash, and an optional theme', () => {
+    const share = 'https://schemasketch.example/?x=1#s=abc'
+    expect(embedCode(share, 'auto', 'Shop').src).toBe('https://schemasketch.example/embed#s=abc')
+    const dark = embedCode(share, 'dark', 'My "big" shop')
+    expect(dark.src).toBe('https://schemasketch.example/embed?theme=dark#s=abc')
+    expect(dark.html).toMatch(/^<iframe src="https:\/\/schemasketch\.example\/embed\?theme=dark#s=abc" title="My &quot;big&quot; shop database diagram"/)
   })
 })

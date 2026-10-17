@@ -1,9 +1,9 @@
 import { BaseEdge, EdgeLabelRenderer, getSmoothStepPath } from '@xyflow/react'
 import type { EdgeProps } from '@xyflow/react'
 import { Trash2 } from 'lucide-react'
-import { memo, useState } from 'react'
+import { memo, useContext, useState } from 'react'
 import type { Cardinality } from '@/lib/dbml/types'
-import { deleteRelationship } from './editing'
+import { DeleteRelationshipContext } from './context'
 import type { RelationEdge } from './graph'
 
 /* ----- crow's foot markers -----
@@ -56,6 +56,7 @@ const WORD: Record<Cardinality, string> = { one: 'one', 'zero-one': 'zero or one
 export const RelationEdgeView = memo(function RelationEdgeView(props: EdgeProps<RelationEdge>) {
   const { id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, data, selected } = props
   const [hover, setHover] = useState(false)
+  const deleteRelationship = useContext(DeleteRelationshipContext)
   if (!data) return null
   const active = data.active || hover || !!selected
 
@@ -111,10 +112,10 @@ export const RelationEdgeView = memo(function RelationEdgeView(props: EdgeProps<
               {ref.name ? `, ${ref.name}` : ''}
               {actions.length ? ` · ${actions.join(', ')}` : ''}
             </div>
-            {selected ? (
+            {selected && deleteRelationship ? (
               <button
                 type="button"
-                onClick={() => void deleteRelationship(ref)}
+                onClick={() => deleteRelationship(ref)}
                 className="mt-1.5 inline-flex h-7 items-center gap-1.5 rounded-md border border-line-strong px-2 text-[12px] font-medium text-danger hover:bg-danger-soft"
               >
                 <Trash2 size={13} /> Delete relationship

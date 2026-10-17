@@ -30,6 +30,7 @@ Planned features are listed in [ROADMAP.md](ROADMAP.md). Contributions are welco
 - **Seed data**: Export → Seed data generates realistic `INSERT` statements for PostgreSQL, MySQL, SQLite or SQL Server, with rows per table you choose. Tables are filled parents first, foreign keys point at real rows, unique and composite keys don't repeat, circular references are completed with `UPDATE`s, and values match the column (emails, names, prices, ISBNs, dates, enum values, lengths). Shuffle for different data; faker.js is loaded only when you open it
 - **Canvas undo and redo**: Ctrl/⌘+Z and Ctrl/⌘+Shift+Z (or the toolbar arrows) step through table moves and auto-layouts, separately from the editor's own undo
 - **Share links**: the whole schema is compressed into the URL hash, so no server is involved
+- **Embed**: Share → Embed gives an `<iframe>` snippet for docs sites and blogs. `/embed#s=…` shows a read-only diagram you can pan and zoom (hover a table to light up its relationships), in light, dark or the reader's theme, with a link to open a copy. It's a separate small page, so embeds never download the editor
 - **Drag and drop** a file anywhere on the window to open it: `.dbml`, `.sql`, `schema.rb`, `.prisma`, a Drizzle `.ts` file, a project `.json` or a database catalog result `.json`. The format is detected and the right import tab opens
 - **Live collaboration, no server of ours**: start a live session and send the invite link. Everyone edits the same DBML and layout at once, peer to peer over WebRTC (Yjs), with each person's cursor in the editor and their name on the table they're looking at. The link carries the encryption key, so a signalling server only sees encrypted connection setup. Leaving keeps a local copy. Tabs in one browser always connect; across devices you need a signalling server both sides can reach. The public `y-webrtc` servers were down when this was written, so run your own with `pnpm signaling` (it's tiny) and enter its address in the session dialog; the invite link passes it on
 - **Installable and offline**: install Schemasketch as an app from the browser; after the first visit it opens without a connection. The app shell, fonts and parser are cached by a service worker; the large SQL import worker is cached the first time you use it. When a new version is deployed, a toast offers to reload
@@ -57,7 +58,7 @@ PORT=4444 pnpm signaling   # a y-webrtc signalling server for live sessions acro
 
 ## Deploy to Netlify
 
-`netlify.toml` already sets the build command, publish folder, Node version, SPA redirect and cache headers.
+`netlify.toml` already sets the build command, publish folder, Node version, the `/embed` and SPA redirects, and cache headers. The app refuses to be framed (`X-Frame-Options: DENY` on `/`), while `/embed` is meant to be.
 
 **From Git:** push the folder to GitHub, then in Netlify choose *Add new site → Import an existing project* and pick the repo. Netlify reads `netlify.toml` and detects pnpm from `pnpm-lock.yaml`. Nothing to fill in.
 
@@ -114,7 +115,8 @@ src/
   lib/collab/         live sessions: Yjs doc + y-webrtc + CodeMirror binding (lazy-loaded), invite links
   lib/seed/           seed data: insert order, keys and constraints, faker values per column (lazy-loaded)
   lib/layoutHistory.ts undo/redo steps for table positions; lib/pdf.ts writes a one-page PDF around a JPEG
-  lib/files.ts        File System Access API with download fallbacks, share-link encoding
+  lib/files.ts        File System Access API with download fallbacks, share-link and embed-code encoding
+  embed/              the read-only diagram page (embed.html), built as a second entry
 ```
 
 Design decisions worth knowing:

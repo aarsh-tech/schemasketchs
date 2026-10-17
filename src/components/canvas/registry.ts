@@ -1,5 +1,6 @@
 import { RelationEdgeView } from './edges'
-import { GroupNodeView, NoteNodeView, TableNodeView } from './nodes'
+import { TableNodeView } from './nodes'
+import { GroupNodeView, NoteNodeView } from './parts'
 
 // defined once at module level so React Flow never sees new objects
 export const nodeTypes = {

@@ -44,7 +44,8 @@ src/
   lib/actions.ts           user-level actions (open, save, import, export, share)
   lib/files.ts             File System Access API + fallbacks, share-link encoding
   components/editor/       CodeMirror: DBML stream language, lint, autocomplete
-  components/canvas/       React Flow: nodes.tsx, edges.tsx (crow's foot), graph.ts (model → nodes/edges), layout.ts (ELK)
+  components/canvas/       React Flow: nodes.tsx (editable tables), parts.tsx (plain table/note/group views), edges.tsx (crow's foot), graph.ts (model → nodes/edges), layout.ts (ELK)
+  embed/                   read-only diagram at /embed (embed.html, a second Vite entry); must not import the editor, stores or lint
   components/dialogs/      all dialogs in Dialogs.tsx
   components/ui/           Button, IconButton, Menu, Dialog, Segmented, Kbd
 ```

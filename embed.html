@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Database diagram · Schemasketch</title>
+    <meta name="robots" content="noindex" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <script>
+      // ?theme=light|dark picks the theme; otherwise follow the visitor's system
+      try {
+        var pref = new URLSearchParams(location.search).get('theme')
+        var dark = pref === 'dark' || (pref !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches)
+        document.documentElement.dataset.theme = dark ? 'dark' : 'light'
+        document.documentElement.style.colorScheme = dark ? 'dark' : 'light'
+      } catch (e) {}
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/embed/main.tsx"></script>
+  </body>
+</html>

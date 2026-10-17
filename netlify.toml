@@ -5,7 +5,13 @@
 [build.environment]
   NODE_VERSION = "22"
 
-# Single-page app: every path serves index.html
+# The read-only diagram for <iframe> embeds
+[[redirects]]
+  from = "/embed"
+  to = "/embed.html"
+  status = 200
+
+# Single-page app: every other path serves index.html
 [[redirects]]
   from = "/*"
   to = "/index.html"
@@ -34,4 +40,14 @@
   [headers.values]
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
+
+# The app itself can't be framed; /embed is meant to be, so it isn't listed here
+[[headers]]
+  for = "/"
+  [headers.values]
+    X-Frame-Options = "DENY"
+
+[[headers]]
+  for = "/index.html"
+  [headers.values]
     X-Frame-Options = "DENY"

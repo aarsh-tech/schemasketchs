@@ -17,7 +17,7 @@ import { cx } from '@/lib/cx'
 import { useCanvas } from '@/store/canvas'
 import { activeViewOf, positionsOf, useProjects } from '@/store/projects'
 import type { XY } from '@/store/projects'
-import type { SchemaModel } from '@/lib/dbml/types'
+import type { RefModel, SchemaModel } from '@/lib/dbml/types'
 import { makeStep } from '@/lib/layoutHistory'
 import { tablesWithin } from '@/lib/search'
 import { useLayoutHistory } from '@/store/layoutHistory'
@@ -29,6 +29,7 @@ import { CanvasToolbar } from './CanvasToolbar'
 import { deleteRelationship, fieldOfHandle, findTable, isDropHandle } from './editing'
 import { EmptyCanvas, EmptyView } from './EmptyCanvas'
 import { FocusBar } from './FocusBar'
+import { DeleteRelationshipContext } from './context'
 import { MarkerDefs } from './edges'
 import type { AnyNode, RelationEdge, TableNode } from './graph'
 import { buildEdges, buildNodes, refreshGroups, relatedTables } from './graph'
@@ -372,11 +373,13 @@ export function DiagramCanvas() {
     [rf],
   )
 
+  const deleteRef = useCallback((ref: RefModel) => void deleteRelationship(ref), [])
   const isEmpty = model.tables.length === 0 && model.notes.length === 0
   const emptyView = !!view && model.tables.length === 0 && fullModel.tables.length > 0
 
   return (
     <div ref={wrapper} className={cx('relative h-full w-full', connecting && 'is-connecting')} data-testid="diagram">
+      <DeleteRelationshipContext.Provider value={deleteRef}>
       <ReactFlow<AnyNode, RelationEdge>
         nodes={displayNodes}
         edges={edges}
@@ -433,6 +436,7 @@ export function DiagramCanvas() {
         <CanvasToolbar onLayout={() => void runLayout(true, true)} onStep={stepLayout} historyKey={historyKey} />
         {focusMode && focusSet ? <FocusBar focus={focusMode} shown={focusSet.size} /> : null}
       </ReactFlow>
+      </DeleteRelationshipContext.Provider>
       {emptyView ? <EmptyView viewId={view.id} /> : isEmpty ? <EmptyCanvas /> : null}
       <CanvasOverlays />
     </div>

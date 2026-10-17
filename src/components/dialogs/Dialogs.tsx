@@ -9,7 +9,8 @@ import type { OrmTarget } from '@/lib/convert'
 import { parseDbml } from '@/lib/dbml/client'
 import type { ImportDialect, ParseDiagnostic, SchemaModel } from '@/lib/dbml/types'
 import type { ChangeKind, MigrationDialect, SummaryItem } from '@/lib/diff'
-import { baseName, clearShareHash, downloadText, guessTextKind, slug } from '@/lib/files'
+import { baseName, clearShareHash, downloadText, embedCode, guessTextKind, slug } from '@/lib/files'
+import type { EmbedTheme } from '@/lib/files'
 import { IDLE_MS, deleteVersions, describeDelta, tableDelta } from '@/lib/history'
 import { neighbours } from '@/lib/views'
 import { liveHash } from '@/lib/collab/link'
@@ -536,32 +537,85 @@ function SharedLinkDialog({ dialog, onClose }: { dialog: { file: import('@/lib/f
 /* ---------- outgoing share link ---------- */
 
 function ShareDialog({ url, onClose }: { url: string | null; onClose: () => void }) {
+  const [tab, setTab] = useState<'link' | 'embed'>('link')
+  const [theme, setTheme] = useState<EmbedTheme>('auto')
+  const name = useProjects((s) => s.projects[s.activeId]?.name ?? 'Schema')
   const long = (url?.length ?? 0) > 8000
+  const embed = url ? embedCode(url, theme, name) : null
   return (
     <Dialog
       open={!!url}
       onClose={onClose}
-      width={560}
-      title="Share a link"
-      description="The whole schema and layout are packed into the link itself. No server stores it, so anyone with the link can open a copy."
+      width={600}
+      title={tab === 'link' ? 'Share a link' : 'Embed the diagram'}
+      description={
+        tab === 'link'
+          ? 'The whole schema and layout are packed into the link itself. No server stores it, so anyone with the link can open a copy.'
+          : 'A read-only diagram people can pan and zoom, for docs sites and blogs. Like the link, it carries the whole schema, so it shows this version until you copy a new one.'
+      }
       footer={
         <>
           <Button onClick={onClose}>Done</Button>
-          <Button variant="primary" onClick={() => url && copyText(url, 'Link copied')}>
-            <Copy size={14} /> Copy link
-          </Button>
+          {tab === 'link' ? (
+            <Button variant="primary" onClick={() => url && copyText(url, 'Link copied')}>
+              <Copy size={14} /> Copy link
+            </Button>
+          ) : (
+            <Button variant="primary" onClick={() => embed && copyText(embed.html, 'Embed code copied')}>
+              <Copy size={14} /> Copy embed code
+            </Button>
+          )}
         </>
       }
     >
-      <textarea
-        readOnly
-        value={url ?? ''}
-        onFocus={(e) => e.currentTarget.select()}
-        className="h-24 w-full resize-none rounded-lg border border-line-strong bg-panel p-2.5 font-mono text-[11.5px] break-all text-ink-2 outline-none"
-      />
+      <div className="mb-3">
+        <Tabs
+          label="Share as"
+          value={tab}
+          onChange={setTab}
+          options={[
+            { value: 'link', label: 'Link' },
+            { value: 'embed', label: 'Embed' },
+          ]}
+        />
+      </div>
+      {tab === 'embed' && embed ? (
+        <div className="grid gap-2">
+          <div className="flex items-center gap-2">
+            <span className="text-[12.5px] text-ink-2">Theme</span>
+            <Segmented
+              label="Embed theme"
+              value={theme}
+              onChange={setTheme}
+              options={[
+                { value: 'auto', label: 'Match the reader', title: 'Light or dark, following the reader’s system setting' },
+                { value: 'light', label: 'Light' },
+                { value: 'dark', label: 'Dark' },
+              ]}
+            />
+          </div>
+          <textarea
+            readOnly
+            value={embed.html}
+            aria-label="Embed code"
+            onFocus={(e) => e.currentTarget.select()}
+            className="h-20 w-full resize-none rounded-lg border border-line-strong bg-panel p-2.5 font-mono text-[11.5px] break-all text-ink-2 outline-none"
+          />
+          <iframe src={embed.src} title="Preview of the embedded diagram" className="h-56 w-full rounded-lg border border-line" loading="lazy" />
+        </div>
+      ) : null}
+      {tab === 'link' ? (
+        <textarea
+          readOnly
+          value={url ?? ''}
+          aria-label="Share link"
+          onFocus={(e) => e.currentTarget.select()}
+          className="h-24 w-full resize-none rounded-lg border border-line-strong bg-panel p-2.5 font-mono text-[11.5px] break-all text-ink-2 outline-none"
+        />
+      ) : null}
       {long ? (
         <p className="mt-2 text-[12.5px] text-ink-2">
-          This link is {Math.round((url?.length ?? 0) / 1000)}k characters long. Some chat apps cut long links; for big schemas, send the saved file instead.
+          This {tab === 'link' ? 'link' : 'embed address'} is {Math.round((url?.length ?? 0) / 1000)}k characters long. Some chat apps and sites cut long links; for big schemas, send the saved file instead.
         </p>
       ) : null}
     </Dialog>

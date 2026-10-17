@@ -102,7 +102,7 @@ Today the diagram only reflects the code. Make edits on the canvas write back in
 
 - Generate realistic `INSERT` statements (choose rows per table) that respect FK order and constraints, with values matched to column names and types (email, name, price, dates). Use `@faker-js/faker`, lazy-loaded.
 
-### - [ ] 14. Embed mode
+### - [x] 14. Embed mode
 
 - `/embed#s=…` renders a read-only, pan-and-zoom diagram with no editor or chrome, for docs sites and blogs. Add a "Copy embed code" button (`<iframe>` snippet) to the Share dialog.
 

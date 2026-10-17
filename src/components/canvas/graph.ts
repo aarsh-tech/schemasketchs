@@ -221,3 +221,21 @@ export function relatedTables(model: SchemaModel, id: string): Set<string> {
 }
 
 export const isNoteId = (id: string) => id.startsWith(NOTE_PREFIX)
+
+/* ---------- table card text ---------- */
+
+export function describeField(f: FieldModel): string {
+  const bits = [`${f.name}  ${f.type}`]
+  const flags = [
+    f.pk && 'primary key',
+    f.increment && 'auto increment',
+    f.unique && 'unique',
+    f.notNull && 'not null',
+    f.defaultValue && `default ${f.defaultValue}`,
+  ].filter(Boolean)
+  if (flags.length) bits.push(flags.join(', '))
+  if (f.note) bits.push(f.note)
+  return bits.join('\n')
+}
+
+export const ROW_CLASS = 'ss-row relative flex items-center gap-2 border-t border-line/70 px-3 text-[12.5px]'

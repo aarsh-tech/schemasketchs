@@ -210,6 +210,16 @@ export function readShareFromHash(hash: string): ProjectFile | null {
   }
 }
 
+export type EmbedTheme = 'auto' | 'light' | 'dark'
+
+/** The /embed address for a share link, and an <iframe> snippet around it. */
+export function embedCode(shareUrl: string, theme: EmbedTheme, name: string): { src: string; html: string } {
+  const u = new URL(shareUrl)
+  const src = `${u.origin}/embed${theme === 'auto' ? '' : `?theme=${theme}`}${u.hash}`
+  const title = `${name} database diagram`.replace(/"/g, '&quot;')
+  return { src, html: `<iframe src="${src}" title="${title}" width="100%" height="480" style="border: 1px solid #dadfd9; border-radius: 8px" loading="lazy"></iframe>` }
+}
+
 export function clearShareHash() {
   history.replaceState(null, '', window.location.pathname + window.location.search)
 }

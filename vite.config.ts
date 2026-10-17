@@ -3,12 +3,27 @@ import { fileURLToPath, URL } from 'node:url'
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
+import type { Connect, Plugin } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
+
+/** Serve embed.html at /embed in dev and preview, as netlify.toml does in production. */
+function embedRoute(): Plugin {
+  const rewrite: Connect.NextHandleFunction = (req, _res, next) => {
+    if (req.url && /^\/embed\/?(\?|$)/.test(req.url)) req.url = req.url.replace(/^\/embed\/?/, '/embed.html')
+    next()
+  }
+  return {
+    name: 'schemasketch-embed-route',
+    configureServer: (server) => void server.middlewares.use(rewrite),
+    configurePreviewServer: (server) => void server.middlewares.use(rewrite),
+  }
+}
 
 export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
+    embedRoute(),
     VitePWA({
       // ask before swapping in a new version: the app shows an "Update available" toast
       registerType: 'prompt',
@@ -37,6 +52,8 @@ export default defineConfig({
         globIgnores: ['**/sql.worker-*.js'],
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
         navigateFallback: 'index.html',
+        // /embed is its own page, not the app
+        navigateFallbackDenylist: [/^\/embed/],
         cleanupOutdatedCaches: true,
         runtimeCaching: [
           {
@@ -66,6 +83,11 @@ export default defineConfig({
     target: 'es2022',
     chunkSizeWarningLimit: 2500,
     rolldownOptions: {
+      // the app, and the read-only diagram for <iframe> embeds
+      input: {
+        main: fileURLToPath(new URL('./index.html', import.meta.url)),
+        embed: fileURLToPath(new URL('./embed.html', import.meta.url)),
+      },
       output: {
         codeSplitting: {
           groups: [
