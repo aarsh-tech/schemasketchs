@@ -79,6 +79,8 @@ Today the diagram only reflects the code. Make edits on the canvas write back in
 - Note in the UI that public WebRTC signalling servers only see the connection setup, never the data.
 
 ### - [ ] 12. AI assistant (bring your own key)
+> **Skipped for now**, at the project owner's request. Don't build this item until they ask for it; go straight from #11 to #13.
+
 - Settings: paste an Anthropic or OpenAI API key. It's stored only in this browser, and the UI says so.
 - Panel with prompts like "Add a reviews feature", "Explain this schema", "Suggest indexes". The AI returns DBML changes, shown as a diff the user must accept before they're applied.
 - Calls go straight from the browser to the provider. Nothing goes through a server of ours.
