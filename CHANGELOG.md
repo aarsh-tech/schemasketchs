@@ -11,3 +11,7 @@ A Version history dialog lists versions with time, label and table-count change,
 ## Migration generator (#3)
 A Generate migration dialog compares two saved versions, a version and the current schema, or pasted DBML, and shows a change summary with up and down `ALTER` scripts for PostgreSQL or MySQL, flagging data loss with warning comments.
 The diff lives in `src/lib/diff/` as pure, lazy-loaded functions (tables with rename detection, columns, keys, indexes, enums, relationships) with 41 Vitest tests. Also fixed: opening one dialog straight from another no longer closes both.
+
+## ORM import and export (#4)
+Import a Prisma schema or a Drizzle schema file (pg-core, mysql-core or sqlite-core) into DBML, and export the schema as Prisma, Drizzle, TypeScript interfaces or Zod 4 schemas, from new tabs in the Import and Export dialogs. Dropped `.prisma` and `.ts` files open the right tab, and anything a format can't hold is listed in a comment instead of being dropped silently.
+The converters live in `src/lib/convert/` as pure, lazy-loaded functions with 93 new Vitest tests: every fixture round-trips through both ORMs, Prisma output passes Prisma's own validator, and the generated TypeScript compiles against the real `drizzle-orm` and `zod`.
