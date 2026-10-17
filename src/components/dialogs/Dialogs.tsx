@@ -17,6 +17,7 @@ import { useDialogs } from '@/store/dialogs'
 import type { ImportFormat } from '@/store/dialogs'
 import { useProjects } from '@/store/projects'
 import { useUi } from '@/store/ui'
+import { CommandPalette } from '@/components/CommandPalette'
 import { Button, Dialog, IconButton, Kbd, Segmented, Tabs } from '@/components/ui/primitives'
 import { cx } from '@/lib/cx'
 
@@ -39,6 +40,7 @@ export function Dialogs() {
       <HistoryDialog open={dialog?.type === 'history'} onClose={close} />
       <MigrationDialog dialog={dialog?.type === 'migration' ? dialog : null} onClose={close} />
       <ViewDialog dialog={dialog?.type === 'view' ? dialog : null} onClose={close} />
+      <CommandPalette dialog={dialog?.type === 'palette' ? dialog : null} onClose={close} />
     </>
   )
 }
@@ -396,6 +398,7 @@ Note todo {
 }`
 
 const SHORTCUTS: [string, string][] = [
+  ['Search tables, columns and commands', 'Ctrl / ⌘ + K'],
   ['Save', 'Ctrl / ⌘ + S'],
   ['Save as', 'Ctrl / ⌘ + Shift + S'],
   ['Open a file', 'Ctrl / ⌘ + O'],
@@ -409,6 +412,8 @@ const SHORTCUTS: [string, string][] = [
   ['Relate two columns', 'Drag a column’s dot onto another'],
   ['Delete a selected relationship', 'Delete'],
   ['Undo a diagram edit', 'Ctrl / ⌘ + Z in the editor'],
+  ['Focus on a table and its neighbours', 'Right-click it, then Focus'],
+  ['Leave focus mode', 'Esc'],
 ]
 
 function HelpDialog({ open, onClose }: { open: boolean; onClose: () => void }) {

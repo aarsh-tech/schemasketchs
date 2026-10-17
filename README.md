@@ -14,7 +14,9 @@ Planned features are listed in [ROADMAP.md](ROADMAP.md). Contributions are welco
 - **Proper ER notation**: crow's-foot markers for one, zero-or-one, many and zero-or-many
 - **Editor**: DBML syntax highlighting, inline errors, autocomplete for keywords, types, tables and columns
 - **Canvas**: drag tables, auto-arrange (ELK layered layout), table groups, sticky notes, minimap, zoom
-- **Focus**: hover a table or put your cursor inside its definition to highlight its relationships; double-click a table to jump to its code
+- **Command palette**: Ctrl/⌘+K (or the search button) jumps to any table or column, centring it on the canvas and in the code, and runs any command: export, layout, theme, views, migrations and more. Fuzzy matching, keyboard first
+- **Focus mode**: right-click a table (or use the palette) to show only it and its neighbours up to 1, 2 or 3 relationships away, dimming or hiding the rest. Esc leaves it
+- **Highlighting**: hover a table or put your cursor inside its definition to highlight its relationships; double-click a table to jump to its code
 - **Views**: tabs above the canvas show named subsets of the schema ("Auth", "Billing"), each with its own layout, while the DBML stays one source. Create one from the + tab (tables selected on the canvas start it off), pick tables with a filterable list, add a table from its right-click menu, and use "Show related tables" to pull in neighbours. Views follow table renames and travel in project files and share links
 - **Column views**: all columns, keys only, or table names only
 - **Multiple schemas**: create, rename, duplicate and delete, all kept in this browser
@@ -65,6 +67,7 @@ npx netlify-cli deploy --prod --dir dist
 
 | Action | Keys |
 | --- | --- |
+| Search tables, columns and commands | Ctrl/⌘ + K |
 | Save | Ctrl/⌘ + S |
 | Save as | Ctrl/⌘ + Shift + S |
 | Open file | Ctrl/⌘ + O |
@@ -75,6 +78,8 @@ npx netlify-cli deploy --prod --dir dist
 | Edit a column | Click it |
 | Delete the selected relationship | Delete |
 | Undo a diagram edit | Ctrl/⌘ + Z in the editor |
+| Focus on a table | Right-click it → Focus on this table |
+| Leave focus mode | Esc |
 
 ## How it works
 
@@ -97,6 +102,7 @@ src/
   lib/catalog/        read-only catalog queries per database, and their JSON result → schema model (pure, lazy-loaded)
   lib/lint/           schema checks, one file per rule (pure, run after each parse)
   lib/views.ts        views: a named list of tables with its own layout, and the filtered model the canvas draws
+  lib/search.ts       fuzzy matching for the command palette, and neighbourhoods for focus mode
   lib/files.ts        File System Access API with download fallbacks, share-link encoding
 ```
 

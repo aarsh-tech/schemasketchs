@@ -1,4 +1,4 @@
-import { Code, EyeOff, Grid2x2Plus, Layers, ListPlus, LoaderCircle, Maximize, Network, Pencil, Trash2 } from 'lucide-react'
+import { Code, Crosshair, EyeOff, Grid2x2Plus, Layers, ListPlus, LoaderCircle, Maximize, Network, Pencil, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useId, useState } from 'react'
 import type { CSSProperties, FormEvent, ReactNode } from 'react'
@@ -51,6 +51,14 @@ function TableMenu({ overlay, table }: { overlay: Of<'table-menu'>; table: Table
     { label: 'Rename table…', icon: <Pencil size={14} />, onSelect: () => useCanvas.getState().open({ type: 'rename-table', tableId: table.id, x, y }) },
     { label: 'Add column…', icon: <ListPlus size={14} />, onSelect: () => useCanvas.getState().open({ type: 'column', tableId: table.id, column: null, x, y }) },
     { label: 'Show in code', icon: <Code size={14} />, onSelect: () => useUi.getState().revealTable(table.id) },
+    {
+      label: 'Focus on this table',
+      icon: <Crosshair size={14} />,
+      onSelect: () => {
+        const cur = useUi.getState().focus
+        useUi.getState().setFocus({ tableId: table.id, depth: cur?.depth ?? 1, hide: cur?.hide ?? false })
+      },
+    },
     ...viewItems(table),
     'separator',
     {

@@ -89,6 +89,14 @@ function whenTableRendered(id: string, cb: (el: HTMLElement) => void) {
   if (ready()) finish()
 }
 
+/** Show a table: centre the canvas on it and, on wider screens, put the editor on its code. */
+export function goToTable(id: string, column: string | null = null) {
+  const ui = useUi.getState()
+  if (window.matchMedia('(max-width: 767px)').matches) ui.setMobileView('diagram')
+  else ui.revealTable(id, column)
+  ui.centerOn(id)
+}
+
 /** Adds every table one relationship away from the view's tables. */
 export function showRelated(view: SchemaView) {
   const extra = neighbours(useUi.getState().model, view.tableIds)

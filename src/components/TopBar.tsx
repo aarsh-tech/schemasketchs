@@ -13,6 +13,7 @@ import {
   Monitor,
   Moon,
   Save,
+  Search,
   Share2,
   Sun,
   Tag,
@@ -218,7 +219,10 @@ export function TopBar() {
           <span className="hidden sm:inline">Share</span>
         </Button>
         <div className="mx-1 h-5 w-px bg-line" />
-        <IconButton label="Version history" onClick={() => useDialogs.getState().open({ type: 'history' })}>
+        <IconButton label={`Search and commands (${mod}K)`} onClick={() => useDialogs.getState().open({ type: 'palette' })}>
+          <Search size={16} />
+        </IconButton>
+        <IconButton label="Version history" onClick={() => useDialogs.getState().open({ type: 'history' })} className="max-sm:hidden">
           <History size={16} />
         </IconButton>
         <IconButton label="DBML help and shortcuts" onClick={() => useDialogs.getState().open({ type: 'help' })}>

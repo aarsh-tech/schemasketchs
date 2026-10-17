@@ -18,12 +18,14 @@ import { useCanvas } from '@/store/canvas'
 import { activeViewOf, positionsOf, useProjects } from '@/store/projects'
 import type { XY } from '@/store/projects'
 import type { SchemaModel } from '@/lib/dbml/types'
+import { tablesWithin } from '@/lib/search'
 import { viewModel } from '@/lib/views'
 import { useUi } from '@/store/ui'
 import { CanvasOverlays } from './CanvasOverlays'
 import { CanvasToolbar } from './CanvasToolbar'
 import { deleteRelationship, fieldOfHandle, findTable, isDropHandle } from './editing'
 import { EmptyCanvas, EmptyView } from './EmptyCanvas'
+import { FocusBar } from './FocusBar'
 import { MarkerDefs } from './edges'
 import type { AnyNode, RelationEdge, TableNode } from './graph'
 import { buildEdges, buildNodes, refreshGroups, relatedTables } from './graph'
@@ -51,8 +53,13 @@ export function DiagramCanvas() {
   const fitRequest = useUi((s) => s.fitRequest)
   const epoch = useUi((s) => s.editorEpoch)
   const canvasEpoch = useUi((s) => s.canvasEpoch)
+  const centerRequest = useUi((s) => s.centerRequest)
+  const focus = useUi((s) => s.focus)
 
   const [nodes, setNodes] = useState<AnyNode[]>([])
+  useEffect(() => {
+    nodesRef.current = nodes
+  })
   const [selectedId, setSelectedId] = useState<string | null>(null)
   // edge ids follow the order of refs in the code, so a selection only holds for the model it was made on
   const [edgeSelection, setEdgeSelection] = useState<{ id: string; model: SchemaModel } | null>(null)
@@ -62,6 +69,8 @@ export function DiagramCanvas() {
   const wrapper = useRef<HTMLDivElement>(null)
 
   /* per-project bookkeeping */
+  const pendingCenter = useRef<string | null>(null)
+  const nodesRef = useRef<AnyNode[]>([])
   const pendingAuto = useRef(false)
   const pendingFit = useRef(false)
   const builtFor = useRef<string | null>(null)
@@ -120,6 +129,16 @@ export function DiagramCanvas() {
     [rf],
   )
 
+  const centerOnNode = useCallback(
+    (id: string) => {
+      requestAnimationFrame(() => {
+        rf.fitView({ nodes: [{ id }], padding: 0.5, duration: 350, maxZoom: 1.1 })
+        setSelectedId(id)
+      })
+    },
+    [rf],
+  )
+
   useEffect(() => {
     if (!nodesInitialized) return
     // right after the nodes are swapped (switching view or project), the flag still describes the old ones
@@ -131,9 +150,12 @@ export function DiagramCanvas() {
     } else if (pendingFit.current) {
       pendingFit.current = false
       setNodes((prev) => refreshGroups(modelRef.current, prev))
-      requestAnimationFrame(() => rf.fitView({ padding: 0.12, maxZoom: 1.1 }))
+      const center = pendingCenter.current
+      pendingCenter.current = null
+      if (center && rf.getNode(center)) centerOnNode(center)
+      else requestAnimationFrame(() => rf.fitView({ padding: 0.12, maxZoom: 1.1 }))
     }
-  }, [nodesInitialized, nodes, runLayout, rf])
+  }, [nodesInitialized, nodes, runLayout, rf, centerOnNode])
 
   useEffect(() => {
     if (layoutRequest) void runLayout(true)
@@ -166,9 +188,25 @@ export function DiagramCanvas() {
     if (node.type === 'table') setSelectedId(node.id)
   }, [])
 
+  /* ---- focus mode: one table and its neighbourhood ---- */
+  const focusMode = focus && model.tables.some((t) => t.id === focus.tableId) ? focus : null
+  const focusSet = useMemo(() => (focusMode ? tablesWithin(model, focusMode.tableId, focusMode.depth) : null), [model, focusMode])
+  const focusSetRef = useRef(focusSet)
+  useEffect(() => {
+    focusSetRef.current = focusSet
+  })
+
   /* ---- highlight / dim ---- */
-  const focusId = hovered ?? selectedId ?? cursorTable
+  const focusId = focusMode ? focusMode.tableId : (hovered ?? selectedId ?? cursorTable)
   const displayNodes = useMemo(() => {
+    if (focusSet) {
+      const shown = focusMode!.hide ? nodes.filter((n) => n.type === 'table' && focusSet.has(n.id)) : nodes
+      return shown.map((n) => {
+        if (n.type !== 'table') return n
+        const d = focusSet.get(n.id)
+        return withHighlight(n, d === 0 ? 'focus' : d === 1 ? 'related' : null, d === undefined ? 'is-dimmed' : undefined)
+      })
+    }
     if (!focusId || !model.tables.some((t) => t.id === focusId)) {
       return nodes.map((n) => (n.type === 'table' && (n.data.highlight || n.className) ? withHighlight(n, null, undefined) : n))
     }
@@ -178,12 +216,41 @@ export function DiagramCanvas() {
       const hl = n.id === focusId ? 'focus' : related.has(n.id) ? 'related' : null
       return withHighlight(n, hl, hl ? undefined : 'is-dimmed')
     })
-  }, [nodes, focusId, model])
+  }, [nodes, focusId, focusSet, focusMode, model])
 
   const edges = useMemo(() => {
-    const built = buildEdges(model, nodes, focusId && model.tables.some((t) => t.id === focusId) ? focusId : null)
+    let built = buildEdges(model, displayNodes, focusId && model.tables.some((t) => t.id === focusId) ? focusId : null)
+    // in focus mode an edge stays lit when both ends are in the neighbourhood
+    if (focusSet) built = built.map((e) => (focusSet.has(e.source) && focusSet.has(e.target) ? { ...e, className: undefined } : { ...e, className: 'is-dimmed' }))
     return selectedEdgeId ? built.map((e) => (e.id === selectedEdgeId ? { ...e, selected: true, className: undefined } : e)) : built
-  }, [model, nodes, focusId, selectedEdgeId])
+  }, [model, displayNodes, focusId, focusSet, selectedEdgeId])
+
+  // frame the neighbourhood whenever focus mode starts or changes
+  const focusKey = focusMode ? `${focusMode.tableId}:${focusMode.depth}:${focusMode.hide}` : ''
+  useEffect(() => {
+    if (!focusKey) return
+    const ids = [...(focusSetRef.current?.keys() ?? [])].map((id) => ({ id }))
+    const raf = requestAnimationFrame(() => rf.fitView({ nodes: ids, padding: 0.18, duration: 300, maxZoom: 1.1 }))
+    return () => cancelAnimationFrame(raf)
+  }, [focusKey, rf])
+
+  /* ---- centre on a table (command palette) ---- */
+  useEffect(() => {
+    if (!centerRequest) return
+    const id = centerRequest.id
+    const store = useProjects.getState()
+    const hiddenByFocus = !!focusSetRef.current && useUi.getState().focus?.hide && !focusSetRef.current.has(id)
+    if (hiddenByFocus) useUi.getState().setFocus(null)
+    if (nodesRef.current.some((n) => n.id === id)) {
+      centerOnNode(id)
+      return
+    }
+    // the table isn't in the open view: show the full diagram, then centre on it
+    if (activeViewOf(store.projects[store.activeId]) && useUi.getState().model.tables.some((t) => t.id === id)) {
+      pendingCenter.current = id
+      store.setActiveView(null)
+    }
+  }, [centerRequest, centerOnNode])
 
   /* ---- editing on the canvas ---- */
   const onEdgesChange = useCallback((changes: EdgeChange<RelationEdge>[]) => {
@@ -296,6 +363,7 @@ export function DiagramCanvas() {
           />
         ) : null}
         <CanvasToolbar onLayout={() => void runLayout(true)} />
+        {focusMode && focusSet ? <FocusBar focus={focusMode} shown={focusSet.size} /> : null}
       </ReactFlow>
       {emptyView ? <EmptyView viewId={view.id} /> : isEmpty ? <EmptyCanvas /> : null}
       <CanvasOverlays />

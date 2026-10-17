@@ -12,6 +12,11 @@ export function useShortcuts() {
       if (key === 's') {
         e.preventDefault()
         void save(e.shiftKey)
+      } else if (key === 'k' && !e.shiftKey) {
+        e.preventDefault()
+        const dialogs = useDialogs.getState()
+        if (dialogs.dialog?.type === 'palette') dialogs.close()
+        else dialogs.open({ type: 'palette' })
       } else if (key === 'o' && !e.shiftKey) {
         e.preventDefault()
         void openFromDisk()

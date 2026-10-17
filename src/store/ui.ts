@@ -7,6 +7,14 @@ export type ThemePref = 'light' | 'dark' | 'system'
 export type DetailLevel = 'all' | 'keys' | 'name'
 export type MobileView = 'editor' | 'diagram'
 
+/** Focus mode: one table and its neighbours up to `depth` relationships away. */
+export interface FocusMode {
+  tableId: string
+  depth: 1 | 2 | 3
+  /** hide the other tables instead of dimming them */
+  hide: boolean
+}
+
 interface UiState {
   theme: ThemePref
   detail: DetailLevel
@@ -33,6 +41,9 @@ interface UiState {
   editorEpoch: number
   /** bumped when saved positions are replaced (restoring a version), so the canvas re-reads them */
   canvasEpoch: number
+  /** set when something asks the canvas to centre on a table */
+  centerRequest: { id: string; nonce: number } | null
+  focus: FocusMode | null
 
   setTheme: (t: ThemePref) => void
   setDetail: (d: DetailLevel) => void
@@ -48,6 +59,8 @@ interface UiState {
   requestFit: () => void
   bumpEditor: () => void
   bumpCanvas: () => void
+  centerOn: (id: string) => void
+  setFocus: (focus: FocusMode | null) => void
 }
 
 export const useUi = create<UiState>()(
@@ -70,6 +83,8 @@ export const useUi = create<UiState>()(
       fitRequest: 0,
       editorEpoch: 0,
       canvasEpoch: 0,
+      centerRequest: null,
+      focus: null,
 
       setTheme: (theme) => set({ theme }),
       setDetail: (detail) => set({ detail }),
@@ -84,7 +99,7 @@ export const useUi = create<UiState>()(
           parsing: false,
         })),
       setParsing: (parsing) => set({ parsing }),
-      resetModel: () => set({ model: EMPTY_SCHEMA, diagnostics: [], modelProjectId: null, cursorTableId: null }),
+      resetModel: () => set({ model: EMPTY_SCHEMA, diagnostics: [], modelProjectId: null, cursorTableId: null, focus: null }),
       setCursorTable: (cursorTableId) => set({ cursorTableId }),
       setHoveredTable: (hoveredTableId) => set({ hoveredTableId }),
       revealTable: (name, column = null) => set({ revealRequest: { name, column, nonce: Date.now() } }),
@@ -92,6 +107,8 @@ export const useUi = create<UiState>()(
       requestFit: () => set((s) => ({ fitRequest: s.fitRequest + 1 })),
       bumpEditor: () => set((s) => ({ editorEpoch: s.editorEpoch + 1 })),
       bumpCanvas: () => set((s) => ({ canvasEpoch: s.canvasEpoch + 1 })),
+      centerOn: (id) => set({ centerRequest: { id, nonce: Date.now() } }),
+      setFocus: (focus) => set({ focus }),
     }),
     {
       name: 'schemasketch:ui',

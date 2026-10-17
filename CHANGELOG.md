@@ -27,3 +27,7 @@ Findings show as yellow squiggles in the editor, a badge on the table that jumps
 ## Multiple views (#7)
 Tabs above the canvas switch between the full diagram and named views, each a subset of tables with its own layout; the DBML stays the single source. Views are made from the + tab or the canvas selection, edited with a filterable table picker, grown with "Show related tables", and changed from a table's right-click menu. They follow table renames, persist with the project (persist version 3) and travel in project files and share links.
 Also fixed: auto-layout after switching projects or views could run before tables were measured and overlap them. `src/lib/views.ts` has 7 Vitest tests.
+
+## Search and focus mode (#8)
+A command palette (Ctrl/⌘+K, or the search button in the top bar) fuzzy-finds tables and columns, centring the canvas on them and selecting them in the code, and runs every app command: exports, layout, views, version history, theme and more.
+Focus mode, from a table's menu or the palette, shows one table and its neighbours up to 1 to 3 relationships away, dimming or hiding the rest, with a bar to change depth and Esc to leave. `src/lib/search.ts` holds the matching and neighbourhood walk, with 9 Vitest tests.

@@ -65,7 +65,7 @@ Today the diagram only reflects the code. Make edits on the canvas write back in
 - A view is a named subset of tables (e.g. "Auth", "Billing") with its own layout. The full schema stays one source.
 - Tabs above the canvas switch views. A table can appear in several views. "Show related tables" adds neighbours.
 
-### - [ ] 8. Search and focus mode
+### - [x] 8. Search and focus mode
 
 - Ctrl/⌘+K command palette: jump to a table or column, and run any command (export, layout, theme…).
 - Focus mode: show only the selected table and its neighbours up to N relationships away (1 to 3), and dim or hide the rest.

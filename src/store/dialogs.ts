@@ -15,6 +15,8 @@ export type DialogState =
   | { type: 'migration'; from?: string; to?: string }
   /** viewId: edit that view; otherwise make a new one starting with tableIds */
   | { type: 'view'; viewId?: string; tableIds?: string[] }
+  /** the command palette; mode 'focus' asks which table to focus on */
+  | { type: 'palette'; mode?: 'focus' }
   | null
 
 export const useDialogs = create<{ dialog: DialogState; open: (d: DialogState) => void; close: () => void }>((set) => ({
