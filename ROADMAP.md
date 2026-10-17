@@ -60,7 +60,7 @@ Today the diagram only reflects the code. Make edits on the canvas write back in
 
 ## Phase 2: catching up with the competition
 
-### - [ ] 7. Multiple views of one schema
+### - [x] 7. Multiple views of one schema
 
 - A view is a named subset of tables (e.g. "Auth", "Billing") with its own layout. The full schema stays one source.
 - Tabs above the canvas switch views. A table can appear in several views. "Show related tables" adds neighbours.

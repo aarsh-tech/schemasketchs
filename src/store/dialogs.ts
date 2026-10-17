@@ -13,6 +13,8 @@ export type DialogState =
   | { type: 'history' }
   /** sides are 'current', 'pasted' or 'v:<version id>' */
   | { type: 'migration'; from?: string; to?: string }
+  /** viewId: edit that view; otherwise make a new one starting with tableIds */
+  | { type: 'view'; viewId?: string; tableIds?: string[] }
   | null
 
 export const useDialogs = create<{ dialog: DialogState; open: (d: DialogState) => void; close: () => void }>((set) => ({

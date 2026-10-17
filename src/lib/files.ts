@@ -1,4 +1,6 @@
 import { compressToEncodedURIComponent, decompressFromEncodedURIComponent } from 'lz-string'
+import { cleanViews } from '@/lib/views'
+import type { SchemaView } from '@/lib/views'
 import type { Project, XY } from '@/store/projects'
 
 /* ---------- project file format ---------- */
@@ -9,10 +11,12 @@ export interface ProjectFile {
   name: string
   source: string
   positions: Record<string, XY>
+  /** optional: older files have none */
+  views?: SchemaView[]
 }
 
-export function toProjectFile(p: Pick<Project, 'name' | 'source' | 'positions'>): ProjectFile {
-  return { app: 'schemasketch', version: 1, name: p.name, source: p.source, positions: p.positions }
+export function toProjectFile(p: Pick<Project, 'name' | 'source' | 'positions' | 'views'>): ProjectFile {
+  return { app: 'schemasketch', version: 1, name: p.name, source: p.source, positions: p.positions, ...(p.views?.length ? { views: p.views } : {}) }
 }
 
 export function parseProjectFile(text: string): ProjectFile | null {
@@ -25,6 +29,7 @@ export function parseProjectFile(text: string): ProjectFile | null {
       name: typeof data.name === 'string' ? data.name : 'Imported schema',
       source: data.source,
       positions: cleanPositions(data.positions),
+      views: cleanViews(data.views),
     }
   } catch {
     return null
@@ -179,10 +184,11 @@ export async function saveProject(project: Project, opts: { saveAs?: boolean } =
 
 const SHARE_KEY = 's'
 
-export function buildShareUrl(project: Pick<Project, 'name' | 'source' | 'positions'>): string {
+export function buildShareUrl(project: Pick<Project, 'name' | 'source' | 'positions' | 'views'>): string {
   const rounded: Record<string, XY> = {}
   for (const [k, p] of Object.entries(project.positions)) rounded[k] = { x: Math.round(p.x), y: Math.round(p.y) }
-  const payload = compressToEncodedURIComponent(JSON.stringify({ n: project.name, s: project.source, p: rounded }))
+  const views = project.views?.length ? { w: cleanViews(project.views) } : {}
+  const payload = compressToEncodedURIComponent(JSON.stringify({ n: project.name, s: project.source, p: rounded, ...views }))
   const url = new URL(window.location.href)
   url.search = ''
   url.hash = `${SHARE_KEY}=${payload}`
@@ -196,9 +202,9 @@ export function readShareFromHash(hash: string): ProjectFile | null {
   try {
     const json = decompressFromEncodedURIComponent(raw)
     if (!json) return null
-    const data = JSON.parse(json) as { n?: string; s?: string; p?: unknown }
+    const data = JSON.parse(json) as { n?: string; s?: string; p?: unknown; w?: unknown }
     if (typeof data.s !== 'string') return null
-    return { app: 'schemasketch', version: 1, name: data.n || 'Shared schema', source: data.s, positions: cleanPositions(data.p) }
+    return { app: 'schemasketch', version: 1, name: data.n || 'Shared schema', source: data.s, positions: cleanPositions(data.p), views: cleanViews(data.w) }
   } catch {
     return null
   }

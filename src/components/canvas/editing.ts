@@ -2,8 +2,11 @@ import { editSchema } from '@/lib/actions'
 import type { RefEndpointSpec, TableRef } from '@/lib/dbml/edit'
 import type { RefModel, SchemaModel, TableModel } from '@/lib/dbml/types'
 import { uniqueName } from '@/lib/dbml/values'
+import { neighbours } from '@/lib/views'
+import type { SchemaView } from '@/lib/views'
+import { toast } from 'sonner'
 import { useCanvas } from '@/store/canvas'
-import { useProjects } from '@/store/projects'
+import { activeViewOf, useProjects } from '@/store/projects'
 import type { XY } from '@/store/projects'
 import { useUi } from '@/store/ui'
 
@@ -48,7 +51,11 @@ export async function deleteRelationship(ref: RefModel) {
 export async function addTable(at?: XY) {
   const model = useUi.getState().model
   const name = uniqueName('new_table', model.tables.map((t) => t.name))
-  if (at) useProjects.getState().setPositions({ [name]: { x: Math.round(at.x), y: Math.round(at.y) } })
+  const store = useProjects.getState()
+  // a table added while a view is open belongs to that view
+  const view = activeViewOf(store.projects[store.activeId])
+  if (view) store.updateView(view.id, { tableIds: [...view.tableIds, name] })
+  if (at) store.setPositions({ [name]: { x: Math.round(at.x), y: Math.round(at.y) } })
   const res = await editSchema({ type: 'add-table', name })
   if (res.ok) whenTableRendered(name, (el) => {
     const r = el.getBoundingClientRect()
@@ -80,6 +87,17 @@ function whenTableRendered(id: string, cb: (el: HTMLElement) => void) {
     unsubscribe()
   }, 4000)
   if (ready()) finish()
+}
+
+/** Adds every table one relationship away from the view's tables. */
+export function showRelated(view: SchemaView) {
+  const extra = neighbours(useUi.getState().model, view.tableIds)
+  if (!extra.length) {
+    toast.success('Every related table is already in this view')
+    return
+  }
+  useProjects.getState().updateView(view.id, { tableIds: [...view.tableIds, ...extra] })
+  toast.success(`Added ${extra.length} related ${extra.length === 1 ? 'table' : 'tables'}`, { description: extra.join(', ') })
 }
 
 /* ---------- single click opens the column editor, double click jumps to code ---------- */

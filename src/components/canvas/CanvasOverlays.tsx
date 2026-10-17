@@ -1,4 +1,5 @@
-import { Code, Grid2x2Plus, ListPlus, LoaderCircle, Maximize, Network, Pencil, Trash2 } from 'lucide-react'
+import { Code, EyeOff, Grid2x2Plus, Layers, ListPlus, LoaderCircle, Maximize, Network, Pencil, Trash2 } from 'lucide-react'
+import { toast } from 'sonner'
 import { useId, useState } from 'react'
 import type { CSSProperties, FormEvent, ReactNode } from 'react'
 import { COLUMN_TYPES } from '@/components/editor/dbmlTools'
@@ -11,9 +12,10 @@ import type { FieldModel, TableModel } from '@/lib/dbml/types'
 import { toDbmlDefault } from '@/lib/dbml/values'
 import { HEADER_COLORS } from '@/lib/palette'
 import { useCanvas } from '@/store/canvas'
+import { activeViewOf, useProjects } from '@/store/projects'
 import type { CanvasOverlay } from '@/store/canvas'
 import { useUi } from '@/store/ui'
-import { addTable, findTable, toTableRef } from './editing'
+import { addTable, findTable, showRelated, toTableRef } from './editing'
 
 type Of<T extends CanvasOverlay['type']> = Extract<CanvasOverlay, { type: T }>
 
@@ -49,6 +51,7 @@ function TableMenu({ overlay, table }: { overlay: Of<'table-menu'>; table: Table
     { label: 'Rename table…', icon: <Pencil size={14} />, onSelect: () => useCanvas.getState().open({ type: 'rename-table', tableId: table.id, x, y }) },
     { label: 'Add column…', icon: <ListPlus size={14} />, onSelect: () => useCanvas.getState().open({ type: 'column', tableId: table.id, column: null, x, y }) },
     { label: 'Show in code', icon: <Code size={14} />, onSelect: () => useUi.getState().revealTable(table.id) },
+    ...viewItems(table),
     'separator',
     {
       label: 'Delete table',
@@ -76,6 +79,35 @@ function TableMenu({ overlay, table }: { overlay: Of<'table-menu'>; table: Table
       </div>
     </ContextMenu>
   )
+}
+
+/** Move a table in or out of views without touching the schema. */
+function viewItems(table: TableModel): MenuEntry[] {
+  const store = useProjects.getState()
+  const project = store.projects[store.activeId]
+  const view = activeViewOf(project)
+  if (view) {
+    return [
+      'separator',
+      { label: 'Remove from this view', icon: <EyeOff size={14} />, onSelect: () => store.updateView(view.id, { tableIds: view.tableIds.filter((id) => id !== table.id) }) },
+      { label: 'Show related tables', icon: <Network size={14} />, onSelect: () => showRelated({ ...view, tableIds: [...new Set([...view.tableIds, table.id])] }) },
+    ]
+  }
+  const others = (project?.views ?? []).filter((v) => !v.tableIds.includes(table.id)).slice(0, 5)
+  if (!others.length) return []
+  return [
+    'separator',
+    ...others.map(
+      (v): MenuEntry => ({
+        label: `Add to ${v.name}`,
+        icon: <Layers size={14} />,
+        onSelect: () => {
+          store.updateView(v.id, { tableIds: [...v.tableIds, table.id] })
+          toast.success(`Added ${label(table)} to the ${v.name} view`)
+        },
+      }),
+    ),
+  ]
 }
 
 function Swatch({ name, pressed, onClick, className, style }: { name: string; pressed: boolean; onClick: () => void; className?: string; style?: CSSProperties }) {

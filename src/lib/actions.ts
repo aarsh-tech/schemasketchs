@@ -47,7 +47,7 @@ export function newProject(source = '', name?: string) {
 }
 
 export function openProjectFile(file: ProjectFile) {
-  useProjects.getState().createProject({ name: file.name, source: file.source, positions: file.positions })
+  useProjects.getState().createProject({ name: file.name, source: file.source, positions: file.positions, views: file.views })
 }
 
 /* ---------- edits made on the canvas ---------- */
@@ -120,7 +120,7 @@ export async function restoreVersion(version: Version) {
   if (before === null || !replaceEditorText(before, version.source)) {
     replaceActive({ source: version.source, positions: version.positions })
   } else {
-    useProjects.getState().setPositions(version.positions, { replace: true })
+    useProjects.getState().setPositions(version.positions, { replace: true, all: true })
     useUi.getState().bumpCanvas()
   }
   toast.success(`Restored the version from ${new Date(version.createdAt).toLocaleString()}`, {

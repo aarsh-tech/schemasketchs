@@ -3,11 +3,10 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { SAMPLE_DBML, SAMPLE_NAME } from '@/lib/sample'
 import { createDebouncedStorage } from '@/lib/storage'
+import { renameInViews } from '@/lib/views'
+import type { SchemaView, XY } from '@/lib/views'
 
-export interface XY {
-  x: number
-  y: number
-}
+export type { SchemaView, XY } from '@/lib/views'
 
 export interface Project {
   id: string
@@ -19,6 +18,10 @@ export interface Project {
   lastGoodSource?: string
   /** schema lint rules switched off for this project */
   lintOff?: string[]
+  /** named subsets of the tables, each with its own layout */
+  views?: SchemaView[]
+  /** view shown on the canvas; null or missing shows every table */
+  activeView?: string | null
   createdAt: number
   updatedAt: number
 }
@@ -26,27 +29,41 @@ export interface Project {
 interface ProjectsState {
   projects: Record<string, Project>
   activeId: string
-  createProject: (input?: Partial<Pick<Project, 'name' | 'source' | 'positions'>>) => string
+  createProject: (input?: Partial<Pick<Project, 'name' | 'source' | 'positions' | 'views'>>) => string
   duplicateProject: (id: string) => string
   deleteProject: (id: string) => void
   renameProject: (id: string, name: string) => void
   setActive: (id: string) => void
   setSource: (source: string) => void
-  setPositions: (positions: Record<string, XY>, opts?: { replace?: boolean }) => void
+  /** Save node positions for the view on screen; `all` writes the full diagram's layout instead. */
+  setPositions: (positions: Record<string, XY>, opts?: { replace?: boolean; all?: boolean }) => void
+  /** Move a table's saved positions and view membership to its new id. */
+  renameTableKey: (from: string, to: string) => void
   replaceProject: (id: string, patch: Partial<Pick<Project, 'source' | 'positions' | 'name'>>) => void
   markGood: (id: string, source: string) => void
   setLintRule: (id: string, rule: string, on: boolean) => void
+  createView: (name: string, tableIds: string[]) => string
+  updateView: (viewId: string, patch: Partial<Pick<SchemaView, 'name' | 'tableIds'>>) => void
+  deleteView: (viewId: string) => void
+  setActiveView: (viewId: string | null) => void
 }
+
+/** The view a project shows, if it's showing one. */
+export const activeViewOf = (p: Project | undefined): SchemaView | null => (p?.activeView ? (p.views?.find((v) => v.id === p.activeView) ?? null) : null)
+
+/** Positions for what's on the canvas: the active view's layout, or the full diagram's. */
+export const positionsOf = (p: Project | undefined): Record<string, XY> => activeViewOf(p)?.positions ?? p?.positions ?? {}
 
 const now = () => Date.now()
 
-function makeProject(input: Partial<Pick<Project, 'name' | 'source' | 'positions'>> = {}): Project {
+function makeProject(input: Partial<Pick<Project, 'name' | 'source' | 'positions' | 'views'>> = {}): Project {
   const t = now()
   return {
     id: nanoid(10),
     name: input.name?.trim() || 'Untitled schema',
     source: input.source ?? '',
     positions: input.positions ?? {},
+    ...(input.views?.length ? { views: input.views } : {}),
     createdAt: t,
     updatedAt: t,
   }
@@ -73,6 +90,7 @@ export const useProjects = create<ProjectsState>()(
           name: `${src.name} copy`,
           source: src.source,
           positions: { ...src.positions },
+          views: src.views?.map((v) => ({ ...v, tableIds: [...v.tableIds], positions: { ...v.positions } })),
         })
       },
 
@@ -118,8 +136,67 @@ export const useProjects = create<ProjectsState>()(
         set((s) => {
           const p = s.projects[s.activeId]
           if (!p) return s
+          const view = opts?.all ? null : activeViewOf(p)
+          if (view) {
+            const next = opts?.replace ? positions : { ...view.positions, ...positions }
+            const views = p.views!.map((v) => (v.id === view.id ? { ...v, positions: next } : v))
+            return { projects: { ...s.projects, [p.id]: { ...p, views, updatedAt: now() } } }
+          }
           const next = opts?.replace ? positions : { ...p.positions, ...positions }
           return { projects: { ...s.projects, [p.id]: { ...p, positions: next, updatedAt: now() } } }
+        })
+      },
+
+      renameTableKey(from, to) {
+        set((s) => {
+          const p = s.projects[s.activeId]
+          if (!p) return s
+          const positions = { ...p.positions }
+          if (positions[from] && !positions[to]) positions[to] = positions[from]
+          delete positions[from]
+          const views = p.views ? renameInViews(p.views, from, to) : p.views
+          return { projects: { ...s.projects, [p.id]: { ...p, positions, views } } }
+        })
+      },
+
+      createView(name, tableIds) {
+        const id = nanoid(8)
+        set((s) => {
+          const p = s.projects[s.activeId]
+          if (!p) return s
+          const view: SchemaView = { id, name: name.trim() || 'View', tableIds: [...new Set(tableIds)], positions: {} }
+          return { projects: { ...s.projects, [p.id]: { ...p, views: [...(p.views ?? []), view], activeView: id, updatedAt: now() } } }
+        })
+        return id
+      },
+
+      updateView(viewId, patch) {
+        set((s) => {
+          const p = s.projects[s.activeId]
+          if (!p?.views?.some((v) => v.id === viewId)) return s
+          const views = p.views.map((v) =>
+            v.id === viewId
+              ? { ...v, ...(patch.name !== undefined ? { name: patch.name.trim() || v.name } : {}), ...(patch.tableIds ? { tableIds: [...new Set(patch.tableIds)] } : {}) }
+              : v,
+          )
+          return { projects: { ...s.projects, [p.id]: { ...p, views, updatedAt: now() } } }
+        })
+      },
+
+      deleteView(viewId) {
+        set((s) => {
+          const p = s.projects[s.activeId]
+          if (!p?.views) return s
+          const views = p.views.filter((v) => v.id !== viewId)
+          return { projects: { ...s.projects, [p.id]: { ...p, views, activeView: p.activeView === viewId ? null : p.activeView, updatedAt: now() } } }
+        })
+      },
+
+      setActiveView(viewId) {
+        set((s) => {
+          const p = s.projects[s.activeId]
+          if (!p || (p.activeView ?? null) === viewId) return s
+          return { projects: { ...s.projects, [p.id]: { ...p, activeView: viewId } } }
         })
       },
 
@@ -152,8 +229,8 @@ export const useProjects = create<ProjectsState>()(
     }),
     {
       name: 'schemasketch:projects',
-      // v2 added the optional lintOff list; older projects load unchanged
-      version: 2,
+      // v2 added the optional lintOff list, v3 the optional views; older projects load unchanged
+      version: 3,
       migrate: (persisted) => persisted as ProjectsState,
       storage: createDebouncedStorage(),
       partialize: (s) => ({ projects: s.projects, activeId: s.activeId }) as ProjectsState,

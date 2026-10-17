@@ -15,6 +15,7 @@ Planned features are listed in [ROADMAP.md](ROADMAP.md). Contributions are welco
 - **Editor**: DBML syntax highlighting, inline errors, autocomplete for keywords, types, tables and columns
 - **Canvas**: drag tables, auto-arrange (ELK layered layout), table groups, sticky notes, minimap, zoom
 - **Focus**: hover a table or put your cursor inside its definition to highlight its relationships; double-click a table to jump to its code
+- **Views**: tabs above the canvas show named subsets of the schema ("Auth", "Billing"), each with its own layout, while the DBML stays one source. Create one from the + tab (tables selected on the canvas start it off), pick tables with a filterable list, add a table from its right-click menu, and use "Show related tables" to pull in neighbours. Views follow table renames and travel in project files and share links
 - **Column views**: all columns, keys only, or table names only
 - **Multiple schemas**: create, rename, duplicate and delete, all kept in this browser
 - **Version history**: a snapshot is taken after 30 seconds without edits, or save one by hand with a label. Browse versions with their time and table-count change, preview the code read-only, and restore both the code and the layout. Stored in IndexedDB: up to 100 automatic snapshots per schema, and labelled ones are never removed
@@ -95,6 +96,7 @@ src/
   lib/convert/        Prisma and Drizzle ⇄ schema model, TypeScript and Zod output, model → DBML (pure, lazy-loaded)
   lib/catalog/        read-only catalog queries per database, and their JSON result → schema model (pure, lazy-loaded)
   lib/lint/           schema checks, one file per rule (pure, run after each parse)
+  lib/views.ts        views: a named list of tables with its own layout, and the filtered model the canvas draws
   lib/files.ts        File System Access API with download fallbacks, share-link encoding
 ```
 

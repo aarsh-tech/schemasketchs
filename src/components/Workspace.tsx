@@ -2,6 +2,7 @@ import { Group, Panel, Separator, useDefaultLayout, usePanelRef } from 'react-re
 import { PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import { DiagramCanvas } from './canvas/DiagramCanvas'
+import { ViewTabs } from './canvas/ViewTabs'
 import { SchemaEditor } from './editor/SchemaEditor'
 import { StatusBar } from './StatusBar'
 import { IconButton, Segmented } from './ui/primitives'
@@ -95,8 +96,11 @@ export function Workspace() {
           <div className={cx('absolute inset-0 bg-panel', mobileView === 'editor' ? 'z-10' : 'pointer-events-none z-0')} inert={mobileView !== 'editor'}>
             <EditorColumn />
           </div>
-          <div className={cx('absolute inset-0 bg-canvas', mobileView === 'diagram' ? 'z-10' : 'pointer-events-none z-0')} inert={mobileView !== 'diagram'}>
-            <DiagramCanvas />
+          <div className={cx('absolute inset-0 flex flex-col bg-canvas', mobileView === 'diagram' ? 'z-10' : 'pointer-events-none z-0')} inert={mobileView !== 'diagram'}>
+            <ViewTabs />
+            <div className="relative min-h-0 flex-1">
+              <DiagramCanvas />
+            </div>
           </div>
         </div>
       </div>
@@ -127,19 +131,22 @@ export function Workspace() {
         <span className="absolute inset-y-0 -left-1.5 -right-1.5" />
       </Separator>
       <Panel id="diagram" minSize={320}>
-        <div className="relative h-full">
-          <DiagramCanvas />
-          {collapsed ? (
-            <div className="absolute top-3 left-3 z-10">
-              <IconButton
-                label="Show editor"
-                onClick={() => editorPanel.current?.expand()}
-                className="border border-line bg-raised shadow-table"
-              >
-                <PanelLeftOpen size={15} />
-              </IconButton>
-            </div>
-          ) : null}
+        <div className="flex h-full flex-col">
+          <ViewTabs
+            leading={
+              collapsed ? (
+                <>
+                  <IconButton label="Show editor" onClick={() => editorPanel.current?.expand()} className="h-7 w-7">
+                    <PanelLeftOpen size={15} />
+                  </IconButton>
+                  <span className="mx-1 h-4 w-px shrink-0 bg-line" />
+                </>
+              ) : null
+            }
+          />
+          <div className="relative min-h-0 flex-1">
+            <DiagramCanvas />
+          </div>
         </div>
       </Panel>
     </Group>

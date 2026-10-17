@@ -52,8 +52,8 @@ export function useSchemaSync() {
 
 /**
  * Positions are keyed by table name. When the user renames exactly one table
- * between two parses, move its saved position to the new name so it doesn't
- * jump across the canvas.
+ * between two parses, move its saved positions (and its place in any view) to
+ * the new name so it doesn't jump across the canvas or drop out of a view.
  */
 function carryPositionsAcrossRename(before: string[], after: string[]) {
   const b = new Set(before)
@@ -61,9 +61,5 @@ function carryPositionsAcrossRename(before: string[], after: string[]) {
   const removed = before.filter((id) => !a.has(id))
   const added = after.filter((id) => !b.has(id))
   if (removed.length !== 1 || added.length !== 1) return
-  const { projects, activeId, setPositions } = useProjects.getState()
-  const positions = projects[activeId]?.positions
-  const pos = positions?.[removed[0]]
-  if (!pos || positions[added[0]]) return
-  setPositions({ [added[0]]: pos })
+  useProjects.getState().renameTableKey(removed[0], added[0])
 }

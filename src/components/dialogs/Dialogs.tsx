@@ -10,6 +10,7 @@ import type { ImportDialect, ParseDiagnostic, SchemaModel } from '@/lib/dbml/typ
 import type { ChangeKind, MigrationDialect, SummaryItem } from '@/lib/diff'
 import { baseName, clearShareHash, downloadText, guessTextKind, slug } from '@/lib/files'
 import { IDLE_MS, deleteVersions, describeDelta, tableDelta } from '@/lib/history'
+import { neighbours } from '@/lib/views'
 import type { Version } from '@/lib/history'
 import { useHistory } from '@/store/history'
 import { useDialogs } from '@/store/dialogs'
@@ -37,6 +38,7 @@ export function Dialogs() {
       <ShareDialog url={dialog?.type === 'share' ? dialog.url : null} onClose={close} />
       <HistoryDialog open={dialog?.type === 'history'} onClose={close} />
       <MigrationDialog dialog={dialog?.type === 'migration' ? dialog : null} onClose={close} />
+      <ViewDialog dialog={dialog?.type === 'view' ? dialog : null} onClose={close} />
     </>
   )
 }
@@ -681,6 +683,130 @@ function HistoryBody({ onClose }: { onClose: () => void }) {
         </div>
       )}
     </div>
+  )
+}
+
+/* ---------- views ---------- */
+
+function ViewDialog({ dialog, onClose }: { dialog: { viewId?: string; tableIds?: string[] } | null; onClose: () => void }) {
+  const view = useProjects((s) => (dialog?.viewId ? s.projects[s.activeId]?.views?.find((v) => v.id === dialog.viewId) : undefined))
+  const editing = !!dialog?.viewId
+  return (
+    <Dialog
+      open={!!dialog}
+      onClose={onClose}
+      width={520}
+      title={editing ? `Edit the ${view?.name ?? ''} view` : 'New view'}
+      description="A view shows some of the schema's tables with a layout of its own. The schema itself stays in one place."
+    >
+      {dialog ? <ViewForm key={dialog.viewId ?? 'new'} viewId={dialog.viewId} initial={view?.tableIds ?? dialog.tableIds ?? []} name={view?.name ?? ''} onClose={onClose} /> : null}
+    </Dialog>
+  )
+}
+
+function ViewForm({ viewId, initial, name: initialName, onClose }: { viewId?: string; initial: string[]; name: string; onClose: () => void }) {
+  const tables = useUi((s) => s.model.tables)
+  const model = useUi((s) => s.model)
+  const [name, setName] = useState(initialName)
+  const [picked, setPicked] = useState(() => new Set(initial))
+  const [filter, setFilter] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const shown = tables.filter((t) => t.id.toLowerCase().includes(filter.trim().toLowerCase()))
+  const toggle = (id: string, on: boolean) =>
+    setPicked((cur) => {
+      const next = new Set(cur)
+      if (on) next.add(id)
+      else next.delete(id)
+      return next
+    })
+  // keep ids for tables that are missing right now (say, mid-rename), so saving doesn't drop them
+  const missing = initial.filter((id) => !tables.some((t) => t.id === id))
+
+  const submit = (e: FormEvent) => {
+    e.preventDefault()
+    if (!name.trim()) return setError('Give the view a name, for example Billing.')
+    const ids = [...tables.map((t) => t.id).filter((id) => picked.has(id)), ...missing.filter((id) => picked.has(id))]
+    const store = useProjects.getState()
+    if (viewId) store.updateView(viewId, { name, tableIds: ids })
+    else store.createView(name, ids)
+    onClose()
+  }
+
+  return (
+    <form onSubmit={submit} className="grid gap-3">
+      <div className="grid gap-1">
+        <label htmlFor="view-name" className="text-[12px] font-medium text-ink-2">
+          Name
+        </label>
+        <input
+          id="view-name"
+          autoFocus
+          value={name}
+          maxLength={40}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="e.g. Auth, Billing, Catalogue"
+          className="h-8 rounded-md border border-line-strong bg-panel px-2.5 text-[13px] outline-none focus:border-accent"
+        />
+      </div>
+      <div className="grid gap-1.5">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-[12px] font-medium text-ink-2">
+            Tables <span className="font-normal text-ink-3">({picked.size} of {tables.length})</span>
+          </span>
+          <span className="flex-1" />
+          <Button
+            size="sm"
+            disabled={!picked.size}
+            title="Add every table one relationship away from the ones picked"
+            onClick={() => {
+              const extra = neighbours(model, [...picked])
+              setPicked((cur) => new Set([...cur, ...extra]))
+            }}
+          >
+            Add related
+          </Button>
+          <Button size="sm" onClick={() => setPicked(new Set(shown.map((t) => t.id).concat([...picked])))}>
+            Select {filter ? 'shown' : 'all'}
+          </Button>
+          <Button size="sm" onClick={() => setPicked(new Set())}>
+            Clear
+          </Button>
+        </div>
+        <label htmlFor="view-filter" className="sr-only">
+          Filter tables
+        </label>
+        <input
+          id="view-filter"
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          placeholder="Filter tables"
+          className="h-8 rounded-md border border-line-strong bg-panel px-2.5 text-[13px] outline-none focus:border-accent"
+        />
+        <ul className="max-h-[40vh] overflow-y-auto rounded-lg border border-line p-1 scrollbar-thin" aria-label="Tables in this view">
+          {shown.map((t) => (
+            <li key={t.id}>
+              <label className="flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 text-[13px] hover:bg-hover">
+                <input type="checkbox" checked={picked.has(t.id)} onChange={(e) => toggle(t.id, e.target.checked)} className="h-3.5 w-3.5 accent-accent" />
+                <span className="min-w-0 flex-1 truncate font-mono text-[12.5px]">{t.id}</span>
+                <span className="text-[11.5px] text-ink-3">{t.fields.length} cols</span>
+              </label>
+            </li>
+          ))}
+          {shown.length === 0 ? <li className="px-2 py-3 text-center text-[12.5px] text-ink-2">No table matches “{filter}”.</li> : null}
+        </ul>
+      </div>
+      {error ? (
+        <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-[12.5px] text-danger">
+          {error}
+        </p>
+      ) : null}
+      <div className="flex justify-end gap-2">
+        <Button onClick={onClose}>Cancel</Button>
+        <Button type="submit" variant="primary">
+          {viewId ? 'Save view' : 'Create view'}
+        </Button>
+      </div>
+    </form>
   )
 }
 

@@ -23,3 +23,7 @@ The queries and the JSON reader live in `src/lib/catalog/` (pure, lazy-loaded) w
 ## Schema linting (#6)
 Seven checks run after every parse: foreign key without an index (skipped for MySQL, which adds them), table without a primary key, nullability that contradicts the relationship (with DBML's `>?` for optional ones, and `set null` on a not null column), relationships between different types, reserved words, mixed naming styles and tables over 40 columns.
 Findings show as yellow squiggles in the editor, a badge on the table that jumps to the code, and a Problems list in the status bar whose Rules tab switches checks off per schema (stored on the project; persist version 2). Rules live in `src/lib/lint/rules/`, one per file, with 16 Vitest tests.
+
+## Multiple views (#7)
+Tabs above the canvas switch between the full diagram and named views, each a subset of tables with its own layout; the DBML stays the single source. Views are made from the + tab or the canvas selection, edited with a filterable table picker, grown with "Show related tables", and changed from a table's right-click menu. They follow table renames, persist with the project (persist version 3) and travel in project files and share links.
+Also fixed: auto-layout after switching projects or views could run before tables were measured and overlap them. `src/lib/views.ts` has 7 Vitest tests.

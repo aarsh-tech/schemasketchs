@@ -15,14 +15,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { MouseEvent as ReactMouseEvent } from 'react'
 import { cx } from '@/lib/cx'
 import { useCanvas } from '@/store/canvas'
-import { useProjects } from '@/store/projects'
+import { activeViewOf, positionsOf, useProjects } from '@/store/projects'
 import type { XY } from '@/store/projects'
 import type { SchemaModel } from '@/lib/dbml/types'
+import { viewModel } from '@/lib/views'
 import { useUi } from '@/store/ui'
 import { CanvasOverlays } from './CanvasOverlays'
 import { CanvasToolbar } from './CanvasToolbar'
 import { deleteRelationship, fieldOfHandle, findTable, isDropHandle } from './editing'
-import { EmptyCanvas } from './EmptyCanvas'
+import { EmptyCanvas, EmptyView } from './EmptyCanvas'
 import { MarkerDefs } from './edges'
 import type { AnyNode, RelationEdge, TableNode } from './graph'
 import { buildEdges, buildNodes, refreshGroups, relatedTables } from './graph'
@@ -32,7 +33,15 @@ import { edgeTypes, nodeTypes } from './registry'
 export function DiagramCanvas() {
   const rf = useReactFlow<AnyNode>()
   const activeId = useProjects((s) => s.activeId)
-  const model = useUi((s) => s.model)
+  const fullModel = useUi((s) => s.model)
+  const view = useProjects((s) => activeViewOf(s.projects[s.activeId]))
+  const viewTables = view?.tableIds
+  // a view shows only its tables; everything below works on this model
+  const model = useMemo(() => (viewTables ? viewModel(fullModel, viewTables) : fullModel), [fullModel, viewTables])
+  const modelRef = useRef(model)
+  useEffect(() => {
+    modelRef.current = model
+  })
   const modelProjectId = useUi((s) => s.modelProjectId)
   const detail = useUi((s) => s.detail)
   const showMinimap = useUi((s) => s.showMinimap)
@@ -60,10 +69,10 @@ export function DiagramCanvas() {
   /* ---- model → nodes ---- */
   useEffect(() => {
     if (modelProjectId !== activeId) return
-    const buildKey = `${activeId}:${epoch}:${canvasEpoch}`
+    const buildKey = `${activeId}:${epoch}:${canvasEpoch}:${view?.id ?? ''}`
     const switched = builtFor.current !== buildKey
     builtFor.current = buildKey
-    const positions = useProjects.getState().projects[activeId]?.positions ?? {}
+    const positions = positionsOf(useProjects.getState().projects[activeId])
 
     setNodes((prev) => {
       const existing = switched ? new Map<string, AnyNode>() : new Map(prev.map((n) => [n.id, n]))
@@ -84,7 +93,7 @@ export function DiagramCanvas() {
       return next
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [model, detail, activeId, modelProjectId, epoch, canvasEpoch])
+  }, [model, detail, activeId, modelProjectId, epoch, canvasEpoch, view?.id])
 
   function viewportCenter(): XY {
     const el = wrapper.current
@@ -98,10 +107,10 @@ export function DiagramCanvas() {
     async (fit = true) => {
       const current = rf.getNodes().filter((n) => n.type !== 'tableGroup')
       if (!current.length) return
-      const positions = await autoLayout(useUi.getState().model, current)
+      const positions = await autoLayout(modelRef.current, current)
       setNodes((prev) =>
         refreshGroups(
-          useUi.getState().model,
+          modelRef.current,
           prev.map((n) => (positions[n.id] ? { ...n, position: positions[n.id] } : n)),
         ),
       )
@@ -113,13 +122,15 @@ export function DiagramCanvas() {
 
   useEffect(() => {
     if (!nodesInitialized) return
+    // right after the nodes are swapped (switching view or project), the flag still describes the old ones
+    if (!rf.getNodes().every((n) => n.type === 'tableGroup' || n.measured?.height)) return
     if (pendingAuto.current) {
       pendingAuto.current = false
       pendingFit.current = false
       void runLayout(true)
     } else if (pendingFit.current) {
       pendingFit.current = false
-      setNodes((prev) => refreshGroups(useUi.getState().model, prev))
+      setNodes((prev) => refreshGroups(modelRef.current, prev))
       requestAnimationFrame(() => rf.fitView({ padding: 0.12, maxZoom: 1.1 }))
     }
   }, [nodesInitialized, nodes, runLayout, rf])
@@ -138,7 +149,7 @@ export function DiagramCanvas() {
       const next = applyNodeChanges(changes, prev)
       // groups follow their tables while dragging and once tables are measured
       const touchesTables = changes.some((c) => c.type === 'position' || c.type === 'dimensions')
-      return touchesTables ? refreshGroups(useUi.getState().model, next) : next
+      return touchesTables ? refreshGroups(modelRef.current, next) : next
     })
   }, [])
 
@@ -228,6 +239,7 @@ export function DiagramCanvas() {
   )
 
   const isEmpty = model.tables.length === 0 && model.notes.length === 0
+  const emptyView = !!view && model.tables.length === 0 && fullModel.tables.length > 0
 
   return (
     <div ref={wrapper} className={cx('relative h-full w-full', connecting && 'is-connecting')} data-testid="diagram">
@@ -285,7 +297,7 @@ export function DiagramCanvas() {
         ) : null}
         <CanvasToolbar onLayout={() => void runLayout(true)} />
       </ReactFlow>
-      {isEmpty ? <EmptyCanvas /> : null}
+      {emptyView ? <EmptyView viewId={view.id} /> : isEmpty ? <EmptyCanvas /> : null}
       <CanvasOverlays />
     </div>
   )
