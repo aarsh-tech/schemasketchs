@@ -30,9 +30,11 @@ src/
   lib/dbml/
     parse.worker.ts        DBML → SchemaModel, and DBML → SQL export (small worker)
     sql.worker.ts          SQL → DBML import (huge: all SQL grammars; lazy-loaded)
+    compile.ts             DBML → SchemaModel via @dbml/parse (worker and tests only)
     normalize.ts           @dbml/core normalized model → our plain SchemaModel
     types.ts               SchemaModel, TableModel, FieldModel, RefModel, …
     client.ts              promise RPC to both workers
+  lib/diff/                SchemaModel diff, change summary, up/down migration SQL (pure; lazy-loaded)
   lib/actions.ts           user-level actions (open, save, import, export, share)
   lib/files.ts             File System Access API + fallbacks, share-link encoding
   components/editor/       CodeMirror: DBML stream language, lint, autocomplete

@@ -26,6 +26,17 @@ export interface TableModel {
   fields: FieldModel[]
   /** names of composite indexes / unique constraints, shown as a footer count */
   indexCount: number
+  indexes: IndexModel[]
+}
+
+export interface IndexModel {
+  name: string | null
+  /** column names; expressions are kept in backticks, as written in DBML */
+  columns: string[]
+  unique: boolean
+  pk: boolean
+  /** index method such as btree or hash */
+  type: string | null
 }
 
 export type Cardinality = 'one' | 'zero-one' | 'many' | 'zero-many'

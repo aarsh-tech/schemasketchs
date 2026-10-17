@@ -9,6 +9,8 @@ export type DialogState =
   | { type: 'shared-link'; file: ProjectFile }
   | { type: 'share'; url: string }
   | { type: 'history' }
+  /** sides are 'current', 'pasted' or 'v:<version id>' */
+  | { type: 'migration'; from?: string; to?: string }
   | null
 
 export const useDialogs = create<{ dialog: DialogState; open: (d: DialogState) => void; close: () => void }>((set) => ({

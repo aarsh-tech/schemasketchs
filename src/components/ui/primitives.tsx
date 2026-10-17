@@ -355,7 +355,11 @@ export function Dialog({
     <dialog
       ref={ref}
       aria-labelledby={titleId}
-      onClose={onClose}
+      // closing it ourselves (open went false) also fires "close"; only report closes we didn't ask for,
+      // or switching straight to another dialog would close that one too
+      onClose={() => {
+        if (open) onClose()
+      }}
       onCancel={(e) => {
         e.preventDefault()
         onClose()
