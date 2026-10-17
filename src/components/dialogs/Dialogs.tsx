@@ -1,9 +1,10 @@
-import { ArrowRight, ArrowRightLeft, Copy, Download, GitCompareArrows, History, LoaderCircle, Minus, Pencil, Plus, Radio, RotateCcw, ShieldCheck, Tag, TriangleAlert } from 'lucide-react'
+import { ArrowRight, ArrowRightLeft, Copy, Download, GitCompareArrows, History, LoaderCircle, Minus, Pencil, Plus, Radio, RotateCcw, ShieldCheck, Shuffle, Tag, TriangleAlert } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import type { ClipboardEvent, FormEvent } from 'react'
 import { copyText, downloadCode, errorText, generateCode, importSchema, openProjectFile, restoreVersion, saveVersion } from '@/lib/actions'
 import type { CodeFormat } from '@/lib/actions'
 import type { CatalogDialect } from '@/lib/catalog'
+import type { SeedDialect } from '@/lib/seed'
 import type { OrmTarget } from '@/lib/convert'
 import { parseDbml } from '@/lib/dbml/client'
 import type { ImportDialect, ParseDiagnostic, SchemaModel } from '@/lib/dbml/types'
@@ -49,6 +50,7 @@ export function Dialogs() {
       <ViewDialog dialog={dialog?.type === 'view' ? dialog : null} onClose={close} />
       <CommandPalette dialog={dialog?.type === 'palette' ? dialog : null} onClose={close} />
       <LiveDialog open={dialog?.type === 'live'} onClose={close} />
+      <SeedDialog open={dialog?.type === 'seed'} onClose={close} />
       <LiveJoinDialog dialog={dialog?.type === 'live-join' ? dialog : null} onClose={close} />
     </>
   )
@@ -706,6 +708,144 @@ function HistoryBody({ onClose }: { onClose: () => void }) {
           ) : null}
         </div>
       )}
+    </div>
+  )
+}
+
+/* ---------- seed data ---------- */
+
+const SEED_DIALECTS: { value: SeedDialect; label: string }[] = [
+  { value: 'postgres', label: 'PostgreSQL' },
+  { value: 'mysql', label: 'MySQL' },
+  { value: 'sqlite', label: 'SQLite' },
+  { value: 'mssql', label: 'SQL Server' },
+]
+
+function SeedDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      width={860}
+      title="Generate seed data"
+      description="Realistic INSERT statements for every table, in an order that satisfies the foreign keys, with values that fit each column's name, type and constraints."
+    >
+      {open ? <SeedBody /> : null}
+    </Dialog>
+  )
+}
+
+function SeedBody() {
+  const model = useUi((s) => s.model)
+  const hasErrors = useUi((s) => s.diagnostics.length > 0)
+  const projectName = useProjects((s) => s.projects[s.activeId]?.name ?? 'schema')
+  const [mod, setMod] = useState<typeof import('@/lib/seed') | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    void import('@/lib/seed').then((m) => !cancelled && setMod(m))
+    return () => {
+      cancelled = true
+    }
+  }, [])
+  const [dialect, setDialect] = useState<SeedDialect>(() => {
+    const db = useUi.getState().model.databaseType ?? ''
+    return /mysql|maria/i.test(db) ? 'mysql' : /sqlite/i.test(db) ? 'sqlite' : /sql ?server|mssql/i.test(db) ? 'mssql' : 'postgres'
+  })
+  const [all, setAll] = useState('10')
+  const [rows, setRows] = useState<Record<string, string>>({})
+  const [seed, setSeed] = useState(1)
+  const count = (id: string) => {
+    const n = Number(rows[id] ?? all)
+    return Number.isFinite(n) ? Math.max(0, Math.min(mod?.MAX_ROWS ?? 5000, Math.floor(n))) : 0
+  }
+  const result = useMemo(() => {
+    if (!mod || !model.tables.length) return null
+    const r: Record<string, number> = {}
+    for (const t of model.tables) {
+      const n = Number(rows[t.id] ?? all)
+      r[t.id] = Number.isFinite(n) ? n : 0
+    }
+    return mod.generateSeed(model, { dialect, rows: r, seed })
+  }, [mod, model, rows, all, dialect, seed])
+  const total = result ? Object.values(result.counts).reduce((a, b) => a + b, 0) : 0
+  const preview = result && result.sql.length > 200_000 ? `${result.sql.slice(0, 200_000)}\n-- … preview cut here; Copy and Download include everything` : (result?.sql ?? '')
+  const fileName = `${slug(projectName)}-seed.${dialect}.sql`
+
+  if (!model.tables.length) return <p className="text-[13px] text-ink-2">Add some tables first; there's nothing to fill yet.</p>
+
+  return (
+    <div className="grid gap-3">
+      {hasErrors ? (
+        <p className="rounded-md bg-warn-soft px-3 py-2 text-[12.5px]">The code has an error, so this uses the last version of the schema that worked.</p>
+      ) : null}
+      <div className="flex flex-wrap items-center gap-2">
+        <Segmented label="Database" value={dialect} onChange={setDialect} options={SEED_DIALECTS} />
+        <div className="flex-1" />
+        <label htmlFor="seed-all" className="text-[12.5px] text-ink-2">
+          Rows per table
+        </label>
+        <input
+          id="seed-all"
+          type="number"
+          min={0}
+          max={mod?.MAX_ROWS ?? 5000}
+          value={all}
+          onChange={(e) => {
+            setAll(e.target.value)
+            setRows({})
+          }}
+          className="h-8 w-20 rounded-md border border-line-strong bg-panel px-2 text-[13px] tabular-nums outline-none focus:border-accent"
+        />
+        <Button variant="outline" onClick={() => setSeed(Math.floor(Math.random() * 1_000_000) + 2)} title="Make different values">
+          <Shuffle size={14} /> Shuffle
+        </Button>
+      </div>
+      <div className="grid gap-3 md:grid-cols-[240px_1fr]">
+        <ul className="max-h-[22vh] overflow-y-auto rounded-lg border border-line p-1 scrollbar-thin md:max-h-[50vh]" aria-label="Rows for each table">
+          {model.tables.map((t) => (
+            <li key={t.id} className="flex items-center gap-2 rounded-md px-2 py-1 hover:bg-hover">
+              <label htmlFor={`seed-${t.id}`} className="min-w-0 flex-1 truncate font-mono text-[12px]">
+                {t.id}
+              </label>
+              <input
+                id={`seed-${t.id}`}
+                type="number"
+                min={0}
+                value={rows[t.id] ?? all}
+                onChange={(e) => setRows((r) => ({ ...r, [t.id]: e.target.value }))}
+                className="h-7 w-16 rounded border border-line-strong bg-panel px-1.5 text-right text-[12.5px] tabular-nums outline-none focus:border-accent"
+              />
+              {result && result.counts[t.id] < count(t.id) ? (
+                <TriangleAlert size={12} className="shrink-0 text-warn" aria-label={`only ${result.counts[t.id]} rows`} />
+              ) : null}
+            </li>
+          ))}
+        </ul>
+        <div className="flex min-w-0 flex-col gap-2">
+          {result?.warnings.length ? (
+            <ul className="grid gap-1 rounded-md bg-warn-soft px-3 py-2 text-[12px]" aria-label="Warnings">
+              {result.warnings.map((w) => (
+                <li key={w} className="flex gap-1.5">
+                  <TriangleAlert size={12} className="mt-0.5 shrink-0 text-warn" aria-hidden /> {w}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[12.5px] text-ink-2">{result ? `${total.toLocaleString()} rows in ${model.tables.length} tables` : 'Loading the generator…'}</span>
+            <div className="flex-1" />
+            <Button variant="outline" disabled={!result} onClick={() => result && copyText(result.sql, 'Seed SQL copied')}>
+              <Copy size={14} /> Copy
+            </Button>
+            <Button variant="primary" disabled={!result} onClick={() => result && downloadText(result.sql, fileName, 'application/sql')}>
+              <Download size={14} /> Download .sql
+            </Button>
+          </div>
+          <pre tabIndex={0} aria-label="Seed SQL" className="h-[38vh] overflow-auto rounded-lg border border-line bg-panel p-3 font-mono text-[11.5px] leading-relaxed text-ink scrollbar-thin md:h-[44vh]">
+            {preview}
+          </pre>
+        </div>
+      </div>
     </div>
   )
 }

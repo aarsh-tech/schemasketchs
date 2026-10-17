@@ -19,6 +19,7 @@ export type DialogState =
   /** the command palette; mode 'focus' asks which table to focus on */
   | { type: 'palette'; mode?: 'focus' }
   | { type: 'live' }
+  | { type: 'seed' }
   /** someone opened a live session link */
   | { type: 'live-join'; room: string; key: string; signaling: string[] }
   | null

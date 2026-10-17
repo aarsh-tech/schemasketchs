@@ -98,7 +98,7 @@ Today the diagram only reflects the code. Make edits on the canvas write back in
 - Panel with prompts like "Add a reviews feature", "Explain this schema", "Suggest indexes". The AI returns DBML changes, shown as a diff the user must accept before they're applied.
 - Calls go straight from the browser to the provider. Nothing goes through a server of ours.
 
-### - [ ] 13. Seed data generator
+### - [x] 13. Seed data generator
 
 - Generate realistic `INSERT` statements (choose rows per table) that respect FK order and constraints, with values matched to column names and types (email, name, price, dates). Use `@faker-js/faker`, lazy-loaded.
 

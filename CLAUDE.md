@@ -38,6 +38,7 @@ src/
   lib/convert/             Prisma/Drizzle ⇄ SchemaModel, TypeScript/Zod export, SchemaModel → DBML (pure; lazy-loaded)
   lib/catalog/             catalog queries per database + their JSON result → SchemaModel (pure; lazy-loaded)
   lib/lint/                schema lint rules, one per file in rules/ (pure; run via hooks/useProblems)
+  lib/seed/                seed INSERTs: FK order, unique keys, faker values (pure; lazy-loaded; tested by loading into PGlite)
   lib/collab/              live sessions: session.ts (Yjs, y-webrtc, y-codemirror.next; lazy) and link.ts (pure)
   store/collab.ts          live session state; the only place that starts or stops a session
   lib/actions.ts           user-level actions (open, save, import, export, share)

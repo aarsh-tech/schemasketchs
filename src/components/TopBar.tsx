@@ -17,6 +17,7 @@ import {
   Save,
   Search,
   Share2,
+  Sprout,
   Sun,
   Tag,
   Trash2,
@@ -212,6 +213,7 @@ export function TopBar() {
     { label: 'SQL, Prisma, Drizzle, types…', icon: <Database size={14} />, onSelect: () => useDialogs.getState().open({ type: 'export-code' }) },
     { label: 'Mermaid diagram', icon: <FileCode size={14} />, onSelect: () => useDialogs.getState().open({ type: 'export-code', format: 'mermaid' }) },
     { label: 'Markdown data dictionary', icon: <FileText size={14} />, onSelect: () => useDialogs.getState().open({ type: 'export-code', format: 'markdown' }) },
+    { label: 'Seed data (INSERTs)…', icon: <Sprout size={14} />, onSelect: () => useDialogs.getState().open({ type: 'seed' }) },
     { label: 'DBML file', icon: <FileCode size={14} />, onSelect: () => void downloadCode('dbml') },
     { label: 'Project file (with layout)', icon: <FileCode size={14} />, onSelect: () => void downloadCode('project') },
   ]

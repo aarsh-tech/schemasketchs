@@ -27,6 +27,7 @@ Planned features are listed in [ROADMAP.md](ROADMAP.md). Contributions are welco
 - **ORM import and export**: import a Prisma `schema.prisma` or a Drizzle schema file (pg-core, mysql-core or sqlite-core) into DBML, with models, enums, relations, indexes and mapped names. Export the schema as a Prisma schema (PostgreSQL, MySQL or SQLite), a Drizzle schema (pg-core or mysql-core), TypeScript row interfaces or Zod 4 schemas. Anything a format can't hold is called out in a comment rather than silently dropped
 - **Import from a live database, with no connection**: pick PostgreSQL, MySQL, SQLite or SQL Server and copy a ready-made read-only catalog query. Run it in your own client and paste back the JSON it returns (or drop the saved `.json` file): tables, columns, types, defaults, primary and foreign keys, indexes, enums and comments become DBML. Schemasketch never connects to the database
 - **Export**: PNG, SVG, PDF (fitted to an A4 page, always in the light theme), SQL (PostgreSQL, MySQL, SQL Server, Oracle), Prisma, Drizzle, TypeScript, Zod, a Mermaid `erDiagram` that GitHub renders, a Markdown data dictionary (every table, column, type, key, note and relationship, with the Mermaid diagram on top), DBML, project JSON
+- **Seed data**: Export → Seed data generates realistic `INSERT` statements for PostgreSQL, MySQL, SQLite or SQL Server, with rows per table you choose. Tables are filled parents first, foreign keys point at real rows, unique and composite keys don't repeat, circular references are completed with `UPDATE`s, and values match the column (emails, names, prices, ISBNs, dates, enum values, lengths). Shuffle for different data; faker.js is loaded only when you open it
 - **Canvas undo and redo**: Ctrl/⌘+Z and Ctrl/⌘+Shift+Z (or the toolbar arrows) step through table moves and auto-layouts, separately from the editor's own undo
 - **Share links**: the whole schema is compressed into the URL hash, so no server is involved
 - **Drag and drop** a file anywhere on the window to open it: `.dbml`, `.sql`, `schema.rb`, `.prisma`, a Drizzle `.ts` file, a project `.json` or a database catalog result `.json`. The format is detected and the right import tab opens
@@ -111,6 +112,7 @@ src/
   lib/views.ts        views: a named list of tables with its own layout, and the filtered model the canvas draws
   lib/search.ts       fuzzy matching for the command palette, and neighbourhoods for focus mode
   lib/collab/         live sessions: Yjs doc + y-webrtc + CodeMirror binding (lazy-loaded), invite links
+  lib/seed/           seed data: insert order, keys and constraints, faker values per column (lazy-loaded)
   lib/layoutHistory.ts undo/redo steps for table positions; lib/pdf.ts writes a one-page PDF around a JPEG
   lib/files.ts        File System Access API with download fallbacks, share-link encoding
 ```
