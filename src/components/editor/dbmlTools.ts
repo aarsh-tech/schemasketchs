@@ -2,6 +2,7 @@ import type { CompletionContext, CompletionResult } from '@codemirror/autocomple
 import type { Diagnostic } from '@codemirror/lint'
 import type { Text } from '@codemirror/state'
 import type { ParseDiagnostic, SchemaModel } from '@/lib/dbml/types'
+import type { Problem } from '@/lib/lint'
 import { tableKey } from '@/lib/dbml/normalize'
 
 /* ---------- table detection ---------- */
@@ -66,6 +67,34 @@ export function findTableLine(doc: Text, tableId: string): { from: number; to: n
   return null
 }
 
+const COLUMN_NAME = /^\s*("(?:[^"\\]|\\.)+"|[\w]+)/
+
+/** Finds a column's name inside its table's block, falling back to the table name. */
+export function findColumnRange(doc: Text, tableId: string, column: string | null): { from: number; to: number } | null {
+  const header = findTableLine(doc, tableId)
+  if (!header || column === null) return header
+  let depth = 0
+  for (let i = doc.lineAt(header.from).number; i <= doc.lines; i++) {
+    const line = doc.line(i)
+    const text = line.text.replace(/\/\/.*$/, '').replace(/'(?:[^'\\]|\\.)*'|`[^`]*`/g, "''")
+    const startDepth = depth
+    for (const ch of text) {
+      if (ch === '{') depth++
+      else if (ch === '}') depth--
+    }
+    if (startDepth === 1) {
+      const m = COLUMN_NAME.exec(line.text)
+      const name = m?.[1].replace(/^"|"$/g, '')
+      if (m && name === column) {
+        const start = line.from + line.text.indexOf(m[1])
+        return { from: start, to: start + m[1].length }
+      }
+    }
+    if (depth <= 0 && i > doc.lineAt(header.from).number) break
+  }
+  return header
+}
+
 /* ---------- diagnostics ---------- */
 
 export function toCmDiagnostics(doc: Text, diags: ParseDiagnostic[]): Diagnostic[] {
@@ -79,6 +108,16 @@ export function toCmDiagnostics(doc: Text, diags: ParseDiagnostic[]): Diagnostic
     if (to <= from) to = Math.min(from + 1, doc.length)
     return { from, to, severity: 'error', message: d.message }
   })
+}
+
+/** Lint findings as editor warnings, underlining the column or table they're about. */
+export function problemsToCm(doc: Text, problems: Problem[]): Diagnostic[] {
+  const out: Diagnostic[] = []
+  for (const p of problems) {
+    const range = findColumnRange(doc, p.tableId, p.column)
+    if (range) out.push({ ...range, severity: 'warning', message: p.message, source: 'Schema check' })
+  }
+  return out.sort((a, b) => a.from - b.from)
 }
 
 /* ---------- autocomplete ---------- */

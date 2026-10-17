@@ -1,8 +1,9 @@
 import { Handle, Position } from '@xyflow/react'
 import type { NodeProps } from '@xyflow/react'
-import { Ellipsis, KeyRound, Link2 } from 'lucide-react'
+import { Ellipsis, KeyRound, Link2, TriangleAlert } from 'lucide-react'
 import { memo } from 'react'
 import type { FieldModel } from '@/lib/dbml/types'
+import { useProblems } from '@/hooks/useProblems'
 import { readableText } from '@/lib/color'
 import { useCanvas } from '@/store/canvas'
 import { useUi } from '@/store/ui'
@@ -115,6 +116,7 @@ export const TableNodeView = memo(function TableNodeView({ data, selected }: Nod
           {table.name}
         </span>
         {table.alias ? <span className="shrink-0 font-mono text-[11px] opacity-75">as {table.alias}</span> : null}
+        <ProblemBadge tableId={table.id} />
         <button
           type="button"
           aria-label={`Actions for ${table.name}`}
@@ -146,6 +148,29 @@ export const TableNodeView = memo(function TableNodeView({ data, selected }: Nod
     </div>
   )
 })
+
+/** Lint findings for one table; opens the first one in the editor. */
+function ProblemBadge({ tableId }: { tableId: string }) {
+  const problems = useProblems().byTable.get(tableId)
+  if (!problems?.length) return null
+  const summary = problems.map((p) => `• ${p.message}`).join('\n')
+  return (
+    <button
+      type="button"
+      title={summary}
+      aria-label={`${problems.length} ${problems.length === 1 ? 'problem' : 'problems'} found by the schema checks. Show in the code`}
+      className="nodrag inline-flex h-5 shrink-0 items-center gap-0.5 rounded-full border border-warn/40 bg-warn-soft px-1.5 font-mono text-[10.5px] font-semibold text-warn"
+      onClick={(e) => {
+        e.stopPropagation()
+        useUi.getState().revealTable(tableId, problems[0].column)
+      }}
+      onDoubleClick={(e) => e.stopPropagation()}
+    >
+      <TriangleAlert size={11} strokeWidth={2.4} />
+      {problems.length}
+    </button>
+  )
+}
 
 export const NoteNodeView = memo(function NoteNodeView({ data, selected }: NodeProps<NoteNode>) {
   const { note } = data

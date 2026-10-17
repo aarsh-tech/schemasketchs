@@ -10,6 +10,7 @@ Planned features are listed in [ROADMAP.md](ROADMAP.md). Contributions are welco
 
 - **Live diagram**: type DBML on the left, tables and relationships redraw on the right as you type
 - **Two-way visual editing**: right-click a table to rename it, add a column, change its header colour or delete it; click a column to edit its name, type, keys, null and default; drag from a column's dot to another column to create a relationship; select a relationship and press Delete to remove it; add tables from the toolbar. Every change is written into the DBML with minimal edits that keep your comments and formatting, and Ctrl+Z in the editor undoes it
+- **Schema checks**: as you type, the schema is checked for foreign keys without an index, tables without a primary key, nullability that doesn't match the relationship (including `>?` for optional ones), relationships between columns of different types, reserved words as names, mixed naming styles and tables over 40 columns. Findings show as yellow squiggles in the editor, a badge on the table, and a Problems list in the status bar; each check can be switched off per schema
 - **Proper ER notation**: crow's-foot markers for one, zero-or-one, many and zero-or-many
 - **Editor**: DBML syntax highlighting, inline errors, autocomplete for keywords, types, tables and columns
 - **Canvas**: drag tables, auto-arrange (ELK layered layout), table groups, sticky notes, minimap, zoom
@@ -93,6 +94,7 @@ src/
   lib/diff/           schema diff → change summary and up/down migration SQL (pure functions, lazy-loaded)
   lib/convert/        Prisma and Drizzle ⇄ schema model, TypeScript and Zod output, model → DBML (pure, lazy-loaded)
   lib/catalog/        read-only catalog queries per database, and their JSON result → schema model (pure, lazy-loaded)
+  lib/lint/           schema checks, one file per rule (pure, run after each parse)
   lib/files.ts        File System Access API with download fallbacks, share-link encoding
 ```
 

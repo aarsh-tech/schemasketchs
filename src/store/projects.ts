@@ -17,6 +17,8 @@ export interface Project {
   positions: Record<string, XY>
   /** last source that parsed cleanly, used to keep a diagram on screen after a reload with errors */
   lastGoodSource?: string
+  /** schema lint rules switched off for this project */
+  lintOff?: string[]
   createdAt: number
   updatedAt: number
 }
@@ -33,6 +35,7 @@ interface ProjectsState {
   setPositions: (positions: Record<string, XY>, opts?: { replace?: boolean }) => void
   replaceProject: (id: string, patch: Partial<Pick<Project, 'source' | 'positions' | 'name'>>) => void
   markGood: (id: string, source: string) => void
+  setLintRule: (id: string, rule: string, on: boolean) => void
 }
 
 const now = () => Date.now()
@@ -128,6 +131,17 @@ export const useProjects = create<ProjectsState>()(
         })
       },
 
+      setLintRule(id, rule, on) {
+        set((s) => {
+          const p = s.projects[id]
+          if (!p) return s
+          const off = new Set(p.lintOff ?? [])
+          if (on) off.delete(rule)
+          else off.add(rule)
+          return { projects: { ...s.projects, [id]: { ...p, lintOff: [...off] } } }
+        })
+      },
+
       replaceProject(id, patch) {
         set((s) => {
           const p = s.projects[id]
@@ -138,7 +152,9 @@ export const useProjects = create<ProjectsState>()(
     }),
     {
       name: 'schemasketch:projects',
-      version: 1,
+      // v2 added the optional lintOff list; older projects load unchanged
+      version: 2,
+      migrate: (persisted) => persisted as ProjectsState,
       storage: createDebouncedStorage(),
       partialize: (s) => ({ projects: s.projects, activeId: s.activeId }) as ProjectsState,
       merge: (persisted, current) => {

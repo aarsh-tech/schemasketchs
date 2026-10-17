@@ -10,7 +10,8 @@ import { useProjects } from '@/store/projects'
 import { useUi } from '@/store/ui'
 import { attachEditor, flashEffect, flashField } from './bridge'
 import { dbmlHighlight, dbmlLanguage } from './dbmlLanguage'
-import { dbmlCompletions, findTableLine, tableAtPosition, toCmDiagnostics } from './dbmlTools'
+import { useProblems } from '@/hooks/useProblems'
+import { dbmlCompletions, findColumnRange, problemsToCm, tableAtPosition, toCmDiagnostics } from './dbmlTools'
 
 const baseTheme = EditorView.theme({
   '&': { color: 'var(--c-ink)' },
@@ -54,20 +55,23 @@ export function SchemaEditor() {
     [],
   )
 
-  // push parser diagnostics into the editor
+  // push parser errors, or lint warnings when the code parses, into the editor
   const diagnostics = useUi((s) => s.diagnostics)
+  const problems = useProblems().list
   useEffect(() => {
     const view = ref.current?.view
     if (!view) return
-    view.dispatch(setDiagnostics(view.state, toCmDiagnostics(view.state.doc, diagnostics)))
-  }, [diagnostics])
+    const doc = view.state.doc
+    const all = diagnostics.length ? toCmDiagnostics(doc, diagnostics) : problemsToCm(doc, problems)
+    view.dispatch(setDiagnostics(view.state, all))
+  }, [diagnostics, problems, activeId, epoch])
 
   // jump to a table when the canvas asks for it
   const reveal = useUi((s) => s.revealRequest)
   useEffect(() => {
     const view = ref.current?.view
     if (!view || !reveal) return
-    const range = findTableLine(view.state.doc, reveal.name)
+    const range = findColumnRange(view.state.doc, reveal.name, reveal.column ?? null)
     if (!range) return
     const lineStart = view.state.doc.lineAt(range.from).from
     view.dispatch({

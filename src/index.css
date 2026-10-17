@@ -27,6 +27,8 @@
   --c-ref: #3b6ea5;
   --c-danger: #b3412f;
   --c-danger-soft: #f6e3df;
+  --c-warn: #a26a00;
+  --c-warn-soft: #f7ecd2;
   --c-table: #ffffff;
   --c-table-row-hover: #f2f5f1;
   --c-edge: #8f9a94;
@@ -56,6 +58,8 @@
   --c-ref: #82a9d8;
   --c-danger: #e57461;
   --c-danger-soft: #3a1f1a;
+  --c-warn: #e3b04b;
+  --c-warn-soft: #382c12;
   --c-table: #1a201e;
   --c-table-row-hover: #212825;
   --c-edge: #56615c;
@@ -87,6 +91,8 @@
   --color-ref: var(--c-ref);
   --color-danger: var(--c-danger);
   --color-danger-soft: var(--c-danger-soft);
+  --color-warn: var(--c-warn);
+  --color-warn-soft: var(--c-warn-soft);
   --color-table: var(--c-table);
   --color-note: var(--c-note);
   --color-note-ink: var(--c-note-ink);
@@ -297,6 +303,15 @@
 }
 .cm-diagnostic-error {
   border-left-color: var(--c-danger) !important;
+}
+.cm-diagnostic-warning {
+  border-left-color: var(--c-warn) !important;
+}
+.cm-lintRange-warning {
+  background-image: none !important;
+  text-decoration: underline wavy var(--c-warn);
+  text-decoration-skip-ink: none;
+  text-underline-offset: 3px;
 }
 .cm-lintRange-error {
   background-image: none !important;

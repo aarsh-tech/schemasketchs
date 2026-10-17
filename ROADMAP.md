@@ -49,7 +49,7 @@ Today the diagram only reflects the code. Make edits on the canvas write back in
 - The user runs it in their own client and pastes the JSON back. Schemasketch builds the DBML from it.
 - Nothing ever connects to a database from the app. Say so in the dialog.
 
-### - [ ] 6. Schema linting
+### - [x] 6. Schema linting
 
 - Rules: FK column without an index; table without a primary key; mixed naming styles (`userId` vs `user_id`); reserved words as names; a ref between columns of different types; nullable FK where the relationship says required; very wide tables (over 40 columns).
 - Show warnings as yellow squiggles in the editor and a small badge on affected tables. A "Problems" list sits in the status bar.

@@ -19,3 +19,7 @@ The converters live in `src/lib/convert/` as pure, lazy-loaded functions with 52
 ## Import from a live database (#5)
 A new Database tab in the Import dialog gives a read-only catalog query for PostgreSQL, MySQL, SQLite or SQL Server. Run it in your own client and paste back (or drop) the JSON it returns: tables, columns, types, defaults, keys, indexes, enums and comments become DBML. The app never connects to a database, and the dialog says so.
 The queries and the JSON reader live in `src/lib/catalog/` (pure, lazy-loaded) with 13 Vitest tests that run the real PostgreSQL query in PGlite and the real SQLite query in `node:sqlite`.
+
+## Schema linting (#6)
+Seven checks run after every parse: foreign key without an index (skipped for MySQL, which adds them), table without a primary key, nullability that contradicts the relationship (with DBML's `>?` for optional ones, and `set null` on a not null column), relationships between different types, reserved words, mixed naming styles and tables over 40 columns.
+Findings show as yellow squiggles in the editor, a badge on the table that jumps to the code, and a Problems list in the status bar whose Rules tab switches checks off per schema (stored on the project; persist version 2). Rules live in `src/lib/lint/rules/`, one per file, with 16 Vitest tests.

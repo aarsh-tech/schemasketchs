@@ -202,12 +202,18 @@ export function Popover({
   label,
   width = 288,
   role = 'dialog',
+  above = false,
+  anchor,
   className,
   onKeyDown,
   children,
 }: {
   x: number
+  /** with `above`, the bottom edge sits at y */
   y: number
+  above?: boolean
+  /** presses on this element (the button that opened it) don't count as outside */
+  anchor?: HTMLElement | null
   onClose: () => void
   label: string
   width?: number
@@ -218,8 +224,10 @@ export function Popover({
 }) {
   const ref = useRef<HTMLDivElement>(null)
   const closeRef = useRef(onClose)
+  const anchorRef = useRef(anchor)
   useEffect(() => {
     closeRef.current = onClose
+    anchorRef.current = anchor
   })
 
   // keep the panel inside the window; this is a DOM write, not React state
@@ -229,14 +237,15 @@ export function Popover({
     const w = el.offsetWidth
     const h = el.offsetHeight
     el.style.left = `${Math.max(8, Math.min(x, window.innerWidth - w - 8))}px`
-    el.style.top = `${y + h > window.innerHeight - 8 ? Math.max(8, window.innerHeight - h - 8) : y}px`
+    const top = above ? y - h : y
+    el.style.top = `${top + h > window.innerHeight - 8 ? Math.max(8, window.innerHeight - h - 8) : Math.max(8, top)}px`
     el.style.visibility = 'visible'
-  }, [x, y])
+  }, [x, y, above])
 
   useEffect(() => {
     const before = document.activeElement as HTMLElement | null
     const onDown = (e: PointerEvent) => {
-      if (!ref.current?.contains(e.target as Node)) closeRef.current()
+      if (!ref.current?.contains(e.target as Node) && !anchorRef.current?.contains(e.target as Node)) closeRef.current()
     }
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {

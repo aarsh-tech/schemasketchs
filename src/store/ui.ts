@@ -24,7 +24,7 @@ interface UiState {
   cursorTableId: string | null
   hoveredTableId: string | null
   /** set when the canvas asks the editor to jump to a table's definition */
-  revealRequest: { name: string; nonce: number } | null
+  revealRequest: { name: string; column?: string | null; nonce: number } | null
   /** bumped to ask the canvas to run auto-layout */
   layoutRequest: number
   /** bumped to ask the canvas to fit everything in view */
@@ -43,7 +43,7 @@ interface UiState {
   resetModel: () => void
   setCursorTable: (id: string | null) => void
   setHoveredTable: (id: string | null) => void
-  revealTable: (name: string) => void
+  revealTable: (name: string, column?: string | null) => void
   requestLayout: () => void
   requestFit: () => void
   bumpEditor: () => void
@@ -87,7 +87,7 @@ export const useUi = create<UiState>()(
       resetModel: () => set({ model: EMPTY_SCHEMA, diagnostics: [], modelProjectId: null, cursorTableId: null }),
       setCursorTable: (cursorTableId) => set({ cursorTableId }),
       setHoveredTable: (hoveredTableId) => set({ hoveredTableId }),
-      revealTable: (name) => set({ revealRequest: { name, nonce: Date.now() } }),
+      revealTable: (name, column = null) => set({ revealRequest: { name, column, nonce: Date.now() } }),
       requestLayout: () => set((s) => ({ layoutRequest: s.layoutRequest + 1 })),
       requestFit: () => set((s) => ({ fitRequest: s.fitRequest + 1 })),
       bumpEditor: () => set((s) => ({ editorEpoch: s.editorEpoch + 1 })),
