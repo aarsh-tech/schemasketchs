@@ -75,7 +75,7 @@ Today the diagram only reflects the code. Make edits on the canvas write back in
 - Undo and redo for table moves and auto-layout (Ctrl+Z on the canvas, separate from editor undo).
 - Export PDF (fit to page, light theme), Mermaid `erDiagram` (renders in GitHub READMEs) and a Markdown data dictionary (each table, its columns, types, notes and relations).
 
-### - [ ] 10. Installable offline app (PWA)
+### - [x] 10. Installable offline app (PWA)
 
 - Use `vite-plugin-pwa`: manifest, icons, and caching of the app shell and fonts. Don't precache the big SQL worker; fetch it the first time it's needed.
 - Show an "Update available, reload" toast when a new version is deployed.

@@ -30,6 +30,7 @@ Planned features are listed in [ROADMAP.md](ROADMAP.md). Contributions are welco
 - **Canvas undo and redo**: Ctrl/⌘+Z and Ctrl/⌘+Shift+Z (or the toolbar arrows) step through table moves and auto-layouts, separately from the editor's own undo
 - **Share links**: the whole schema is compressed into the URL hash, so no server is involved
 - **Drag and drop** a file anywhere on the window to open it: `.dbml`, `.sql`, `schema.rb`, `.prisma`, a Drizzle `.ts` file, a project `.json` or a database catalog result `.json`. The format is detected and the right import tab opens
+- **Installable and offline**: install Schemasketch as an app from the browser; after the first visit it opens without a connection. The app shell, fonts and parser are cached by a service worker; the large SQL import worker is cached the first time you use it. When a new version is deployed, a toast offers to reload
 - Light and dark themes, works on phones
 
 ## Run it locally
@@ -56,6 +57,8 @@ pnpm test       # unit tests (Vitest)
 `netlify.toml` already sets the build command, publish folder, Node version, SPA redirect and cache headers.
 
 **From Git:** push the folder to GitHub, then in Netlify choose *Add new site → Import an existing project* and pick the repo. Netlify reads `netlify.toml` and detects pnpm from `pnpm-lock.yaml`. Nothing to fill in.
+
+The build also writes a service worker (`sw.js`) and a web app manifest; `netlify.toml` tells browsers to re-check both on every visit so updates arrive.
 
 **From your machine:**
 

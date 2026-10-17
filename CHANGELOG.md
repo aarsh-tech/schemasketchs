@@ -35,3 +35,7 @@ Focus mode, from a table's menu or the palette, shows one table and its neighbou
 ## Canvas undo/redo and more exports (#9)
 Table moves and auto-layouts can be undone and redone with Ctrl/⌘+Z and Ctrl/⌘+Shift+Z on the canvas or the toolbar arrows, per schema and view and separate from the editor's undo.
 New exports: PDF fitted to an A4 page in the light theme (written by a small built-in PDF writer, no library), a Mermaid `erDiagram`, and a Markdown data dictionary with the diagram embedded. 12 Vitest tests, including Mermaid's own parser accepting every fixture.
+
+## Installable offline app (#10)
+Schemasketch is now a PWA (vite-plugin-pwa): a web app manifest with new icons, and a service worker that precaches the app shell, fonts, the parse worker and the lazy chunks. The 15 MB SQL import worker isn't precached; it's cached the first time it's used.
+After the first visit the app opens offline, and when a new version is deployed an "Update available" toast offers to reload. Checked against a production preview: an offline reload renders the diagram, and a rebuilt deploy brings up the toast.

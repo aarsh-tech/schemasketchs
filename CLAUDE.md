@@ -52,6 +52,7 @@ src/
 - **Positions live apart from the text**, in `project.positions`, keyed by node id (table id is `name`, or `schema.name` outside `public`; sticky notes are `note:<name>`). Each view in `project.views` has its own `positions`; `setPositions` writes to the view on screen, and `positionsOf(project)` reads them.
 - **Parsing only happens in the worker.** Never import `@dbml/core`'s main entry on the main thread: it pulls in about 15 MB of SQL grammars. The parse worker imports internals through the Vite aliases `@dbml-core-database` and `@dbml-core-exporter` (see `vite.config.ts` and `lib/dbml/vendor.d.ts`). Only `sql.worker.ts` may import `@dbml/core` itself.
 - **Heavy libraries are lazy-loaded** with dynamic `import()` (elkjs already is). Keep the main bundle small.
+- **Offline (PWA)**: `vite-plugin-pwa` precaches the build except `sql.worker-*.js`, which is runtime-cached on first use (see `vite.config.ts`). The service worker only registers in production builds (`hooks/useServiceWorker.ts`); test it with `pnpm build && pnpm preview`.
 - **Never call setState inside an effect.** oxlint flags it. Derive values during render, or remount with a `key`.
 - **Persisted data shapes** (`schemasketch:projects`, `schemasketch:ui`, project `.json` files, share links): when you change one, keep old data loading. Bump the persist `version` and add a `migrate`.
 

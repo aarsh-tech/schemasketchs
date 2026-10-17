@@ -5,6 +5,7 @@ import { TopBar } from '@/components/TopBar'
 import { Workspace } from '@/components/Workspace'
 import { useFileDrop, useIncomingShare, useShortcuts } from '@/hooks/useAppEvents'
 import { useSchemaSync } from '@/hooks/useSchemaSync'
+import { useServiceWorker } from '@/hooks/useServiceWorker'
 import { useApplyTheme } from '@/hooks/useTheme'
 import { useVersionHistory } from '@/hooks/useVersionHistory'
 
@@ -14,6 +15,7 @@ export default function App() {
   useVersionHistory()
   useShortcuts()
   useIncomingShare()
+  useServiceWorker()
   const dragging = useFileDrop()
 
   return (
