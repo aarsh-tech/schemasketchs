@@ -159,7 +159,7 @@ export function TopBar() {
     { label: 'Version history…', icon: <History size={14} />, onSelect: () => useDialogs.getState().open({ type: 'history' }) },
     { label: 'Generate migration…', icon: <GitCompareArrows size={14} />, onSelect: () => useDialogs.getState().open({ type: 'migration' }) },
     'separator',
-    { label: 'Import from SQL…', icon: <Upload size={14} />, onSelect: () => useDialogs.getState().open({ type: 'import-sql' }) },
+    { label: 'Import SQL, Prisma or Drizzle…', icon: <Upload size={14} />, onSelect: () => useDialogs.getState().open({ type: 'import' }) },
   ]
 
   const exportItems: MenuEntry[] = [
@@ -167,7 +167,7 @@ export function TopBar() {
     { label: 'PNG image', icon: <Image size={14} />, onSelect: () => void downloadImage(rf.getNodes(), 'png') },
     { label: 'SVG image', icon: <Image size={14} />, onSelect: () => void downloadImage(rf.getNodes(), 'svg') },
     { heading: 'Code' },
-    { label: 'SQL and more…', icon: <Database size={14} />, onSelect: () => useDialogs.getState().open({ type: 'export-code' }) },
+    { label: 'SQL, Prisma, Drizzle, types…', icon: <Database size={14} />, onSelect: () => useDialogs.getState().open({ type: 'export-code' }) },
     { label: 'DBML file', icon: <FileCode size={14} />, onSelect: () => void downloadCode('dbml') },
     { label: 'Project file (with layout)', icon: <FileCode size={14} />, onSelect: () => void downloadCode('project') },
   ]

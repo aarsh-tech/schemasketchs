@@ -20,9 +20,10 @@ Planned features are listed in [ROADMAP.md](ROADMAP.md). Contributions are welco
 - **Migration generator**: compare two saved versions, a version and the current schema, or pasted DBML, and get a readable change summary plus up and down `ALTER` scripts for PostgreSQL or MySQL. Renamed tables are detected, and destructive steps (dropping a table, column or enum value) carry warning comments. Copy or download the SQL. Open it from File → Generate migration, or with "Compare with current" in the version history
 - **Files**: open/save `.dbml` or project `.json` (schema + layout). On Chrome and Edge, saving writes straight back to the file you opened
 - **Import SQL**: PostgreSQL, MySQL, SQL Server, Snowflake, Oracle and Rails `schema.rb`
-- **Export**: PNG, SVG, SQL (PostgreSQL, MySQL, SQL Server, Oracle), DBML, project JSON
+- **ORM import and export**: import a Prisma `schema.prisma` or a Drizzle schema file (pg-core, mysql-core or sqlite-core) into DBML, with models, enums, relations, indexes and mapped names. Export the schema as a Prisma schema (PostgreSQL, MySQL or SQLite), a Drizzle schema (pg-core or mysql-core), TypeScript row interfaces or Zod 4 schemas. Anything a format can't hold is called out in a comment rather than silently dropped
+- **Export**: PNG, SVG, SQL (PostgreSQL, MySQL, SQL Server, Oracle), Prisma, Drizzle, TypeScript, Zod, DBML, project JSON
 - **Share links**: the whole schema is compressed into the URL hash, so no server is involved
-- **Drag and drop** a file anywhere on the window to open it
+- **Drag and drop** a file anywhere on the window to open it: `.dbml`, `.sql`, `schema.rb`, `.prisma`, a Drizzle `.ts` file or a project `.json`. The format is detected and the right import tab opens
 - Light and dark themes, works on phones
 
 ## Run it locally
@@ -89,6 +90,7 @@ src/
     canvas/           React Flow nodes, crow's-foot edges, ELK auto-layout
     dialogs/          import, export, share, help
   lib/diff/           schema diff → change summary and up/down migration SQL (pure functions, lazy-loaded)
+  lib/convert/        Prisma and Drizzle ⇄ schema model, TypeScript and Zod output, model → DBML (pure, lazy-loaded)
   lib/files.ts        File System Access API with download fallbacks, share-link encoding
 ```
 
@@ -97,6 +99,7 @@ Design decisions worth knowing:
 - **The DBML text is the single source of truth.** Table positions are stored separately as `{ tableName: { x, y } }`, so re-parsing never moves your layout. Renaming one table carries its position over to the new name.
 - **Parsing happens off the main thread** in a Web Worker, debounced while typing, so the editor never stutters on big schemas. If the source has errors, the last good diagram stays on screen.
 - **`@dbml/core` is split.** Its main entry bundles every SQL grammar (~15 MB). The live parser imports only the model and exporter modules through Vite aliases (see `vite.config.ts`), keeping the always-loaded worker around 600 KB. The full package loads only when you import SQL.
+- **ORM converters don't need the ORMs.** Prisma schemas are read by a small hand-written parser, and Drizzle files by a forgiving reader for the slice of TypeScript that schema files use, so nothing heavy ships to the browser. The tests check the output with the real tools instead: Prisma's own schema validator, and the TypeScript compiler against `drizzle-orm` and `zod`.
 - **New tables avoid overlap**: they're placed in the nearest free spot to the middle of the current view.
 
 ## Stack
