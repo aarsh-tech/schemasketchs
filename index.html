@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Schemasketch: database diagrams from DBML</title>
+    <meta name="description" content="Draw database diagrams by writing DBML. Free, runs entirely in your browser, exports SQL, PNG and SVG." />
+    <meta name="theme-color" content="#F3F4F1" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <script>
+      // apply the saved theme before first paint to avoid a flash
+      try {
+        var pref = (JSON.parse(localStorage.getItem('schemasketch:ui') || '{}').state || {}).theme || 'system'
+        var dark = pref === 'dark' || (pref === 'system' && matchMedia('(prefers-color-scheme: dark)').matches)
+        document.documentElement.dataset.theme = dark ? 'dark' : 'light'
+      } catch (e) {}
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

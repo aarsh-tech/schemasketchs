@@ -1,0 +1,56 @@
+{
+  "name": "schemasketch",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Draw database diagrams by writing DBML. Runs entirely in the browser.",
+  "license": "MIT",
+  "type": "module",
+  "packageManager": "pnpm@10.28.0",
+  "engines": {
+    "node": ">=20.19"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -b",
+    "lint": "oxlint"
+  },
+  "dependencies": {
+    "@codemirror/autocomplete": "^6.20.3",
+    "@codemirror/commands": "^6.11.1",
+    "@codemirror/lang-sql": "^6.10.0",
+    "@codemirror/language": "^6.13.1",
+    "@codemirror/lint": "^6.9.7",
+    "@codemirror/state": "^6.7.6",
+    "@codemirror/view": "^6.43.14",
+    "@dbml/core": "^10.3.1",
+    "@dbml/parse": "10.3.1",
+    "@fontsource-variable/jetbrains-mono": "^5.3.0",
+    "@fontsource-variable/schibsted-grotesk": "^5.3.0",
+    "@lezer/highlight": "^1.2.5",
+    "@uiw/react-codemirror": "^4.25.12",
+    "@xyflow/react": "^12.12.0",
+    "elkjs": "^0.12.0",
+    "html-to-image": "^1.11.13",
+    "lucide-react": "^1.59.0",
+    "lz-string": "^1.5.0",
+    "nanoid": "^6.0.2",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "react-resizable-panels": "^4.14.5",
+    "sonner": "^2.0.8",
+    "zustand": "^5.0.15"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/node": "^24.13.3",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.7",
+    "@vitejs/plugin-react": "^6.1.1",
+    "oxlint": "^1.81.0",
+    "tailwindcss": "^4.3.3",
+    "typescript": "~6.0.2",
+    "vite": "^8.3.0"
+  }
+}
