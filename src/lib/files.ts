@@ -88,8 +88,8 @@ export const supportsFileSystemAccess = () => typeof fsWindow().showSaveFilePick
 
 const OPEN_TYPES: PickerType[] = [
   {
-    description: 'Schemas (DBML, Schemasketch project, SQL)',
-    accept: { 'text/plain': ['.dbml', '.sql', '.txt'], 'application/json': ['.json'] },
+    description: 'Schemas (DBML, Schemasketch project, SQL, Prisma, Drizzle)',
+    accept: { 'text/plain': ['.dbml', '.sql', '.txt', '.prisma', '.rb', '.ts', '.mts', '.js', '.mjs'], 'application/json': ['.json'] },
   },
 ]
 const SAVE_TYPES: PickerType[] = [
@@ -123,7 +123,7 @@ export async function pickFile(): Promise<OpenedFile | null> {
   return new Promise((resolve) => {
     const input = document.createElement('input')
     input.type = 'file'
-    input.accept = '.dbml,.sql,.txt,.json'
+    input.accept = '.dbml,.sql,.txt,.json,.prisma,.rb,.ts,.mts,.js,.mjs'
     input.onchange = async () => {
       const file = input.files?.[0]
       resolve(file ? { name: file.name, text: await file.text() } : null)
@@ -210,12 +210,34 @@ export function clearShareHash() {
 
 /* ---------- misc ---------- */
 
-export function guessKind(name: string, text: string): 'dbml' | 'project' | 'sql' {
-  const lower = name.toLowerCase()
-  if (lower.endsWith('.json')) return 'project'
-  if (lower.endsWith('.sql')) return 'sql'
-  if (lower.endsWith('.dbml')) return 'dbml'
-  return /^\s*create\s+(table|type|schema)/im.test(text) ? 'sql' : 'dbml'
+export type FileKind = 'dbml' | 'project' | 'sql' | 'prisma' | 'drizzle'
+
+const KIND_BY_EXTENSION: Record<string, FileKind> = {
+  json: 'project',
+  sql: 'sql',
+  rb: 'sql',
+  dbml: 'dbml',
+  prisma: 'prisma',
+  ts: 'drizzle',
+  mts: 'drizzle',
+  cts: 'drizzle',
+  js: 'drizzle',
+  mjs: 'drizzle',
+}
+
+/** What a file holds, from its extension and, failing that, its text. */
+export function guessKind(name: string, text: string): FileKind {
+  const ext = /\.([a-z]+)$/i.exec(name)?.[1]?.toLowerCase()
+  if (ext && KIND_BY_EXTENSION[ext]) return KIND_BY_EXTENSION[ext]
+  return guessTextKind(text) ?? 'dbml'
+}
+
+/** Recognise pasted Prisma, Drizzle or SQL; null when it looks like none of them. */
+export function guessTextKind(text: string): Exclude<FileKind, 'project' | 'dbml'> | null {
+  if (/^\s*(model|datasource|generator)\s+\w+\s*\{/m.test(text)) return 'prisma'
+  if (/\b(pg|mysql|sqlite)Table(Creator)?\s*\(|from\s+['"]drizzle-orm/.test(text)) return 'drizzle'
+  if (/^\s*create\s+(table|type|schema)|ActiveRecord::Schema/im.test(text)) return 'sql'
+  return null
 }
 
 export const baseName = (filename: string) => filename.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' ').trim() || 'Imported schema'

@@ -1,8 +1,10 @@
 import { create } from 'zustand'
 import type { ProjectFile } from '@/lib/files'
 
+export type ImportFormat = 'sql' | 'prisma' | 'drizzle'
+
 export type DialogState =
-  | { type: 'import-sql'; text?: string; fileName?: string }
+  | { type: 'import'; format?: ImportFormat; text?: string; fileName?: string }
   | { type: 'export-code' }
   | { type: 'help' }
   | { type: 'delete-project'; projectId: string }

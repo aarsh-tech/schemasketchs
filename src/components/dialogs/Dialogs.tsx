@@ -1,18 +1,21 @@
 import { ArrowRight, ArrowRightLeft, Copy, Download, GitCompareArrows, History, LoaderCircle, Minus, Pencil, Plus, RotateCcw, Tag, TriangleAlert } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
-import type { FormEvent } from 'react'
-import { copyText, downloadCode, errorText, generateCode, importSql, openProjectFile, restoreVersion, saveVersion } from '@/lib/actions'
+import type { ClipboardEvent, FormEvent } from 'react'
+import { copyText, downloadCode, errorText, generateCode, importSchema, openProjectFile, restoreVersion, saveVersion } from '@/lib/actions'
+import type { CodeFormat } from '@/lib/actions'
+import type { OrmTarget } from '@/lib/convert'
 import { parseDbml } from '@/lib/dbml/client'
-import type { ImportDialect, ParseDiagnostic, SchemaModel, SqlDialect } from '@/lib/dbml/types'
+import type { ImportDialect, ParseDiagnostic, SchemaModel } from '@/lib/dbml/types'
 import type { ChangeKind, MigrationDialect, SummaryItem } from '@/lib/diff'
-import { baseName, clearShareHash, downloadText, slug } from '@/lib/files'
+import { baseName, clearShareHash, downloadText, guessTextKind, slug } from '@/lib/files'
 import { IDLE_MS, deleteVersions, describeDelta, tableDelta } from '@/lib/history'
 import type { Version } from '@/lib/history'
 import { useHistory } from '@/store/history'
 import { useDialogs } from '@/store/dialogs'
+import type { ImportFormat } from '@/store/dialogs'
 import { useProjects } from '@/store/projects'
 import { useUi } from '@/store/ui'
-import { Button, Dialog, IconButton, Kbd, Segmented } from '@/components/ui/primitives'
+import { Button, Dialog, IconButton, Kbd, Segmented, Tabs } from '@/components/ui/primitives'
 import { cx } from '@/lib/cx'
 
 export function Dialogs() {
@@ -20,10 +23,12 @@ export function Dialogs() {
   const close = useDialogs((s) => s.close)
   return (
     <>
-      <ImportSqlDialog
-        key={dialog?.type === 'import-sql' ? `import:${dialog.fileName ?? ''}:${dialog.text?.length ?? 0}` : 'import:closed'}
-        open={dialog?.type === 'import-sql'}
-        initialText={dialog?.type === 'import-sql' ? dialog.text : undefined} fileName={dialog?.type === 'import-sql' ? dialog.fileName : undefined} onClose={close} />
+      <ImportDialog
+        key={dialog?.type === 'import' ? `import:${dialog.format ?? ''}:${dialog.fileName ?? ''}:${dialog.text?.length ?? 0}` : 'import:closed'}
+        open={dialog?.type === 'import'}
+        initial={dialog?.type === 'import' ? dialog : {}}
+        onClose={close}
+      />
       <ExportCodeDialog open={dialog?.type === 'export-code'} onClose={close} />
       <HelpDialog open={dialog?.type === 'help'} onClose={close} />
       <DeleteProjectDialog projectId={dialog?.type === 'delete-project' ? dialog.projectId : null} onClose={close} />
@@ -35,7 +40,7 @@ export function Dialogs() {
   )
 }
 
-/* ---------- import SQL ---------- */
+/* ---------- import ---------- */
 
 const IMPORT_DIALECTS: { value: ImportDialect; label: string }[] = [
   { value: 'postgres', label: 'PostgreSQL' },
@@ -54,23 +59,46 @@ function guessDialect(sql: string): ImportDialect {
   return 'postgres'
 }
 
-function ImportSqlDialog({ open, initialText, fileName, onClose }: { open: boolean; initialText?: string; fileName?: string; onClose: () => void }) {
+const IMPORT_FORMATS: { value: ImportFormat; label: string; description: string; placeholder: string }[] = [
+  {
+    value: 'sql',
+    label: 'SQL',
+    description: 'Paste CREATE TABLE statements or a Rails schema.rb. Schemasketch converts them to DBML in your browser; nothing is uploaded.',
+    placeholder: 'CREATE TABLE users (\n  id SERIAL PRIMARY KEY,\n  email VARCHAR(255) UNIQUE NOT NULL\n);',
+  },
+  {
+    value: 'prisma',
+    label: 'Prisma',
+    description: 'Paste a schema.prisma file. Models, enums, relations, indexes and @map names become DBML in your browser; nothing is uploaded.',
+    placeholder: 'model User {\n  id    Int    @id @default(autoincrement())\n  email String @unique\n  posts Post[]\n}',
+  },
+  {
+    value: 'drizzle',
+    label: 'Drizzle',
+    description: 'Paste a Drizzle schema file (pg-core, mysql-core or sqlite-core). Tables, enums, references and indexes become DBML in your browser; nothing is uploaded.',
+    placeholder: "export const users = pgTable('users', {\n  id: serial('id').primaryKey(),\n  email: varchar('email', { length: 255 }).notNull().unique(),\n})",
+  },
+]
+
+function ImportDialog({ open, initial, onClose }: { open: boolean; initial: { format?: ImportFormat; text?: string; fileName?: string }; onClose: () => void }) {
   // the parent remounts this dialog (via key) each time it opens, so initial state is enough
-  const [sql, setSql] = useState(initialText ?? '')
-  const [dialect, setDialect] = useState<ImportDialect>(() => (initialText ? guessDialect(initialText) : 'postgres'))
+  const [text, setText] = useState(initial.text ?? '')
+  const [format, setFormat] = useState<ImportFormat>(initial.format ?? 'sql')
+  const [dialect, setDialect] = useState<ImportDialect>(() => (initial.text ? guessDialect(initial.text) : 'postgres'))
   const [mode, setMode] = useState<'new' | 'replace'>('new')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const current = IMPORT_FORMATS.find((f) => f.value === format)!
 
   const submit = async () => {
-    if (!sql.trim()) {
-      setError('Paste some CREATE TABLE statements first.')
+    if (!text.trim()) {
+      setError(`Paste a ${format === 'sql' ? 'SQL' : current.label} schema first.`)
       return
     }
     setBusy(true)
     setError(null)
     try {
-      await importSql(sql, dialect, mode, fileName ? baseName(fileName) : undefined)
+      await importSchema(format, text, { dialect, mode, name: initial.fileName ? baseName(initial.fileName) : undefined })
       onClose()
     } catch (err) {
       setError(errorText(err))
@@ -79,13 +107,22 @@ function ImportSqlDialog({ open, initialText, fileName, onClose }: { open: boole
     }
   }
 
+  // pasting into an empty box picks the matching tab
+  const onPaste = (e: ClipboardEvent<HTMLTextAreaElement>) => {
+    if (text.trim()) return
+    const pasted = e.clipboardData.getData('text')
+    const kind = guessTextKind(pasted)
+    if (kind) setFormat(kind)
+    if (kind === 'sql' || (!kind && format === 'sql')) setDialect(guessDialect(pasted))
+  }
+
   return (
     <Dialog
       open={open}
       onClose={onClose}
       width={680}
-      title={fileName ? `Import ${fileName}` : 'Import from SQL'}
-      description="Paste CREATE TABLE statements. Schemasketch converts them to DBML; your SQL isn't sent anywhere."
+      title={initial.fileName ? `Import ${initial.fileName}` : 'Import a schema'}
+      description={current.description}
       footer={
         <>
           <Button onClick={onClose}>Cancel</Button>
@@ -97,21 +134,7 @@ function ImportSqlDialog({ open, initialText, fileName, onClose }: { open: boole
       }
     >
       <div className="flex flex-wrap items-center gap-2">
-        <label className="text-[12.5px] text-ink-2" htmlFor="import-dialect">
-          Dialect
-        </label>
-        <select
-          id="import-dialect"
-          value={dialect}
-          onChange={(e) => setDialect(e.target.value as ImportDialect)}
-          className="h-8 rounded-md border border-line-strong bg-raised px-2 text-[13px]"
-        >
-          {IMPORT_DIALECTS.map((d) => (
-            <option key={d.value} value={d.value}>
-              {d.label}
-            </option>
-          ))}
-        </select>
+        <Tabs label="Import from" value={format} onChange={setFormat} options={IMPORT_FORMATS} />
         <div className="flex-1" />
         <Segmented
           label="Where to import"
@@ -123,18 +146,39 @@ function ImportSqlDialog({ open, initialText, fileName, onClose }: { open: boole
           ]}
         />
       </div>
+      {format === 'sql' ? (
+        <div className="mt-3 flex items-center gap-2">
+          <label className="text-[12.5px] text-ink-2" htmlFor="import-dialect">
+            Dialect
+          </label>
+          <select
+            id="import-dialect"
+            value={dialect}
+            onChange={(e) => setDialect(e.target.value as ImportDialect)}
+            className="h-8 rounded-md border border-line-strong bg-raised px-2 text-[13px]"
+          >
+            {IMPORT_DIALECTS.map((d) => (
+              <option key={d.value} value={d.value}>
+                {d.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      ) : null}
       <textarea
-        value={sql}
-        onChange={(e) => setSql(e.target.value)}
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onPaste={onPaste}
         spellCheck={false}
-        placeholder={'CREATE TABLE users (\n  id SERIAL PRIMARY KEY,\n  email VARCHAR(255) UNIQUE NOT NULL\n);'}
+        aria-label={`${current.label} to import`}
+        placeholder={current.placeholder}
         className="mt-3 h-72 w-full resize-y rounded-lg border border-line-strong bg-panel p-3 font-mono text-[12.5px] leading-relaxed outline-none focus:border-accent"
         onKeyDown={(e) => {
           if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') void submit()
         }}
       />
       {error ? (
-        <p role="alert" className="mt-2 rounded-md bg-danger-soft px-3 py-2 text-[12.5px] text-danger">
+        <p role="alert" className="mt-2 rounded-md bg-danger-soft px-3 py-2 text-[12.5px] whitespace-pre-wrap text-danger">
           {error}
         </p>
       ) : null}
@@ -144,34 +188,65 @@ function ImportSqlDialog({ open, initialText, fileName, onClose }: { open: boole
 
 /* ---------- export code ---------- */
 
-type CodeFormat = SqlDialect | 'dbml' | 'project'
-const CODE_FORMATS: { value: CodeFormat; label: string }[] = [
+const CODE_FORMATS: ({ value: CodeFormat; label: string } | 'separator')[] = [
   { value: 'postgres', label: 'PostgreSQL' },
   { value: 'mysql', label: 'MySQL' },
   { value: 'mssql', label: 'SQL Server' },
   { value: 'oracle', label: 'Oracle' },
+  'separator',
+  { value: 'prisma', label: 'Prisma' },
+  { value: 'drizzle', label: 'Drizzle' },
+  { value: 'typescript', label: 'TypeScript' },
+  { value: 'zod', label: 'Zod' },
+  'separator',
   { value: 'dbml', label: 'DBML' },
   { value: 'project', label: 'Project JSON' },
 ]
 
+const TARGETS: Partial<Record<CodeFormat, { value: OrmTarget; label: string }[]>> = {
+  prisma: [
+    { value: 'postgres', label: 'PostgreSQL' },
+    { value: 'mysql', label: 'MySQL' },
+    { value: 'sqlite', label: 'SQLite' },
+  ],
+  drizzle: [
+    { value: 'postgres', label: 'pg-core' },
+    { value: 'mysql', label: 'mysql-core' },
+  ],
+}
+
+/** The database the schema says it targets, from its Project database_type. */
+function targetFor(databaseType: string | null): OrmTarget {
+  if (/mysql|maria/i.test(databaseType ?? '')) return 'mysql'
+  if (/sqlite/i.test(databaseType ?? '')) return 'sqlite'
+  return 'postgres'
+}
+
 function ExportCodeDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const databaseType = useUi((s) => s.model.databaseType)
   const [format, setFormat] = useState<CodeFormat>('postgres')
-  const [result, setResult] = useState<{ format: CodeFormat; code: string; error: string | null } | null>(null)
-  const loading = result?.format !== format
+  // null follows the schema's database_type until someone picks a target
+  const [picked, setPicked] = useState<OrmTarget | null>(null)
+  const targets = TARGETS[format]
+  const preferred = picked ?? targetFor(databaseType)
+  const target = targets ? (targets.some((t) => t.value === preferred) ? preferred : targets[0].value) : 'postgres'
+  const key = `${format}:${target}`
+  const [result, setResult] = useState<{ key: string; code: string; error: string | null } | null>(null)
+  const loading = result?.key !== key
   const code = result?.code ?? ''
   const error = loading ? null : (result?.error ?? null)
 
   useEffect(() => {
     if (!open) return
     let cancelled = false
-    generateCode(format).then(
-      (c) => !cancelled && setResult({ format, code: c, error: null }),
-      (err) => !cancelled && setResult({ format, code: '', error: errorText(err) }),
+    generateCode(format, target).then(
+      (c) => !cancelled && setResult({ key: `${format}:${target}`, code: c, error: null }),
+      (err) => !cancelled && setResult({ key: `${format}:${target}`, code: '', error: errorText(err) }),
     )
     return () => {
       cancelled = true
     }
-  }, [open, format])
+  }, [open, format, target])
 
   return (
     <Dialog
@@ -185,29 +260,21 @@ function ExportCodeDialog({ open, onClose }: { open: boolean; onClose: () => voi
           <Button variant="outline" disabled={!code || !!error} onClick={() => copyText(code, 'Copied to clipboard')}>
             <Copy size={14} /> Copy
           </Button>
-          <Button variant="primary" disabled={!code || !!error} onClick={() => downloadCode(format)}>
+          <Button variant="primary" disabled={!code || !!error} onClick={() => downloadCode(format, target)}>
             <Download size={14} /> Download
           </Button>
         </>
       }
     >
-      <div className="flex flex-wrap gap-1" role="tablist" aria-label="Format">
-        {CODE_FORMATS.map((f) => (
-          <button
-            key={f.value}
-            role="tab"
-            type="button"
-            aria-selected={format === f.value}
-            onClick={() => setFormat(f.value)}
-            className={cx(
-              'h-7 rounded-md px-2.5 text-[12.5px] font-medium',
-              format === f.value ? 'bg-accent text-accent-ink' : 'text-ink-2 hover:bg-hover hover:text-ink',
-            )}
-          >
-            {f.label}
-          </button>
-        ))}
-      </div>
+      <Tabs label="Format" value={format} onChange={setFormat} options={CODE_FORMATS} />
+      {targets ? (
+        <div className="mt-3 flex items-center gap-2">
+          <span className="text-[12.5px] text-ink-2" id="export-target">
+            {format === 'prisma' ? 'Provider' : 'Dialect'}
+          </span>
+          <Segmented label={format === 'prisma' ? 'Provider' : 'Dialect'} value={target} onChange={setPicked} options={targets} />
+        </div>
+      ) : null}
       <div className="relative mt-3">
         {error ? (
           <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-[12.5px] text-danger">
@@ -278,7 +345,7 @@ const SHORTCUTS: [string, string][] = [
 
 function HelpDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   return (
-    <Dialog open={open} onClose={onClose} width={720} title="Writing DBML" description="Everything you need for most schemas. Drop a .dbml, .sql or .json file anywhere on the window to open it.">
+    <Dialog open={open} onClose={onClose} width={720} title="Writing DBML" description="Everything you need for most schemas. Drop a .dbml, .sql, .prisma, Drizzle .ts or project .json file anywhere on the window to open it.">
       <div className="grid gap-5 md:grid-cols-[1.35fr_1fr]">
         <pre className="overflow-auto rounded-lg border border-line bg-panel p-3 font-mono text-[11.5px] leading-relaxed text-ink scrollbar-thin">{CHEATSHEET}</pre>
         <div>

@@ -35,6 +35,7 @@ src/
     types.ts               SchemaModel, TableModel, FieldModel, RefModel, …
     client.ts              promise RPC to both workers
   lib/diff/                SchemaModel diff, change summary, up/down migration SQL (pure; lazy-loaded)
+  lib/convert/             Prisma/Drizzle ⇄ SchemaModel, TypeScript/Zod export, SchemaModel → DBML (pure; lazy-loaded)
   lib/actions.ts           user-level actions (open, save, import, export, share)
   lib/files.ts             File System Access API + fallbacks, share-link encoding
   components/editor/       CodeMirror: DBML stream language, lint, autocomplete

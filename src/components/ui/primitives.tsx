@@ -393,6 +393,55 @@ export function Dialog({
 
 /* ---------- segmented control ---------- */
 
+/** A row of tabs. Arrow keys move between them; `'separator'` draws a divider between groups. */
+export function Tabs<T extends string>({
+  value,
+  options,
+  onChange,
+  label,
+}: {
+  value: T
+  options: ({ value: T; label: ReactNode } | 'separator')[]
+  onChange: (v: T) => void
+  label: string
+}) {
+  const tabs = options.filter((o): o is { value: T; label: ReactNode } => o !== 'separator')
+  const onKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>) => {
+    const i = tabs.findIndex((t) => t.value === value)
+    const step = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0
+    const next = e.key === 'Home' ? 0 : e.key === 'End' ? tabs.length - 1 : step ? (i + step + tabs.length) % tabs.length : -1
+    if (next < 0) return
+    e.preventDefault()
+    onChange(tabs[next].value)
+    e.currentTarget.querySelector<HTMLButtonElement>(`[data-tab="${tabs[next].value}"]`)?.focus()
+  }
+  return (
+    <div className="flex flex-wrap items-center gap-1" role="tablist" aria-label={label} onKeyDown={onKeyDown}>
+      {options.map((o, i) =>
+        o === 'separator' ? (
+          <span key={`sep${i}`} aria-hidden className="mx-1 h-4 w-px bg-line max-sm:hidden" />
+        ) : (
+          <button
+            key={o.value}
+            role="tab"
+            type="button"
+            data-tab={o.value}
+            aria-selected={value === o.value}
+            tabIndex={value === o.value ? 0 : -1}
+            onClick={() => onChange(o.value)}
+            className={cx(
+              'h-7 rounded-md px-2.5 text-[12.5px] font-medium',
+              value === o.value ? 'bg-accent text-accent-ink' : 'text-ink-2 hover:bg-hover hover:text-ink',
+            )}
+          >
+            {o.label}
+          </button>
+        ),
+      )}
+    </div>
+  )
+}
+
 export function Segmented<T extends string>({
   value,
   options,

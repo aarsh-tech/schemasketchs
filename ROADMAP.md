@@ -36,7 +36,7 @@ Today the diagram only reflects the code. Make edits on the canvas write back in
 - Show a readable change summary above the SQL. Copy and download buttons.
 - Put the diff logic in `src/lib/diff/` as pure functions, with Vitest tests.
 
-### - [ ] 4. ORM import and export
+### - [x] 4. ORM import and export
 
 - Import: Prisma schema (`schema.prisma`) to DBML. Then Drizzle (pg-core / mysql-core table definitions).
 - Export: Prisma schema, Drizzle schema, TypeScript interfaces, Zod schemas.

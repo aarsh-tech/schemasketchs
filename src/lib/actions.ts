@@ -1,7 +1,8 @@
 import type { Node } from '@xyflow/react'
 import { toast } from 'sonner'
 import { editorText, replaceEditorText, undoInEditor } from '@/components/editor/bridge'
-import { editDbml, exportSql, importToDbml } from '@/lib/dbml/client'
+import type { OrmExportFormat, OrmTarget } from '@/lib/convert'
+import { editDbml, exportSql, importToDbml, parseDbml } from '@/lib/dbml/client'
 import type { SchemaEdit } from '@/lib/dbml/edit'
 import type { ImportDialect, SqlDialect } from '@/lib/dbml/types'
 import { renderDiagram } from '@/lib/exportImage'
@@ -22,6 +23,7 @@ import type { ProjectFile } from '@/lib/files'
 import type { Version } from '@/lib/history'
 import { useHistory } from '@/store/history'
 import { useDialogs } from '@/store/dialogs'
+import type { ImportFormat } from '@/store/dialogs'
 import { useProjects } from '@/store/projects'
 import { useUi } from '@/store/ui'
 
@@ -149,8 +151,8 @@ export function handleIncomingFile(name: string, text: string, handle?: FileSyst
     toast.success(`Opened ${file.name}`)
     return
   }
-  if (kind === 'sql') {
-    useDialogs.getState().open({ type: 'import-sql', text, fileName: name })
+  if (kind === 'sql' || kind === 'prisma' || kind === 'drizzle') {
+    useDialogs.getState().open({ type: 'import', format: kind, text, fileName: name })
     return
   }
   const id = useProjects.getState().createProject({ name: baseName(name), source: text })
@@ -171,35 +173,78 @@ export async function save(saveAs = false) {
   }
 }
 
-/* ---------- import SQL ---------- */
+/* ---------- import SQL, Prisma, Drizzle ---------- */
 
-export async function importSql(sql: string, dialect: ImportDialect, mode: 'new' | 'replace', name?: string) {
-  const dbml = await importToDbml(sql, dialect)
-  if (mode === 'replace') replaceActive({ source: dbml })
-  else useProjects.getState().createProject({ name: name ?? 'Imported schema', source: dbml })
-  toast.success(mode === 'replace' ? 'Replaced the schema with the imported SQL' : 'Imported SQL into a new schema')
+const FORMAT_LABEL: Record<ImportFormat, string> = { sql: 'SQL', prisma: 'Prisma', drizzle: 'Drizzle' }
+
+export async function importSchema(format: ImportFormat, text: string, opts: { dialect: ImportDialect; mode: 'new' | 'replace'; name?: string }) {
+  let dbml: string
+  let warnings: string[] = []
+  if (format === 'sql') dbml = await importToDbml(text, opts.dialect)
+  else {
+    const { importOrm } = await import('@/lib/convert')
+    const result = importOrm(format, text)
+    dbml = result.dbml
+    warnings = result.warnings
+  }
+  if (opts.mode === 'replace') replaceActive({ source: dbml })
+  else useProjects.getState().createProject({ name: opts.name ?? 'Imported schema', source: dbml })
+  const what = FORMAT_LABEL[format]
+  const title = opts.mode === 'replace' ? `Replaced the schema with the imported ${what}` : `Imported ${what} into a new schema`
+  if (warnings.length) {
+    toast.warning(title, { description: `${warnings.length === 1 ? 'One thing' : `${warnings.length} things`} couldn't be converted. They're listed in a comment at the top of the code.` })
+  } else toast.success(title)
 }
 
 /* ---------- export ---------- */
 
+export type CodeFormat = SqlDialect | OrmExportFormat | 'dbml' | 'project'
 
-export async function generateCode(format: SqlDialect | 'dbml' | 'project'): Promise<string> {
+const ORM_FORMATS = new Set<CodeFormat>(['prisma', 'drizzle', 'typescript', 'zod'])
+
+/** Code for the current schema. `target` picks the database for Prisma and Drizzle. */
+export async function generateCode(format: CodeFormat, target: OrmTarget = 'postgres'): Promise<string> {
   const p = active()
   if (!p) return ''
   if (format === 'dbml') return p.source
   if (format === 'project') return JSON.stringify(toProjectFile(p), null, 2)
-  return exportSql(p.source, format)
+  if (ORM_FORMATS.has(format)) {
+    const [{ exportOrm }, { model, diagnostics }] = await Promise.all([import('@/lib/convert'), parseDbml(p.source)])
+    if (!model) {
+      const d = diagnostics[0]
+      throw new Error(`The schema has an error on line ${d?.line ?? 1}: ${d?.message ?? 'unknown'}`)
+    }
+    return exportOrm(format as OrmExportFormat, model, target)
+  }
+  return exportSql(p.source, format as SqlDialect)
 }
 
-export async function downloadCode(format: SqlDialect | 'dbml' | 'project') {
+function codeFileName(format: CodeFormat, base: string): [name: string, type: string] {
+  switch (format) {
+    case 'dbml':
+      return [`${base}.dbml`, 'text/plain']
+    case 'project':
+      return [`${base}.schemasketch.json`, 'application/json']
+    case 'prisma':
+      return ['schema.prisma', 'text/plain']
+    case 'drizzle':
+      return [`${base}.schema.ts`, 'text/typescript']
+    case 'typescript':
+      return [`${base}.types.ts`, 'text/typescript']
+    case 'zod':
+      return [`${base}.zod.ts`, 'text/typescript']
+    default:
+      return [`${base}.${format}.sql`, 'application/sql']
+  }
+}
+
+export async function downloadCode(format: CodeFormat, target?: OrmTarget) {
   const p = active()
   if (!p) return
   try {
-    const text = await generateCode(format)
-    const base = slug(p.name)
-    if (format === 'dbml') downloadText(text, `${base}.dbml`)
-    else if (format === 'project') downloadText(text, `${base}.schemasketch.json`, 'application/json')
-    else downloadText(text, `${base}.${format}.sql`, 'application/sql')
+    const text = await generateCode(format, target)
+    const [name, type] = codeFileName(format, slug(p.name))
+    downloadText(text, name, type)
   } catch (err) {
     toast.error('Could not export', { description: errorText(err) })
   }
