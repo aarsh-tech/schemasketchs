@@ -8,7 +8,9 @@
   Cool graphite paper, pine-green ink for structure, brass for keys,
   steel blue for references.
 */
-:root {
+/* [data-theme='light'] also lets one subtree print light inside a dark app (PDF export) */
+:root,
+[data-theme='light'] {
   --c-bg: #f3f4f1;
   --c-panel: #fbfbf9;
   --c-raised: #ffffff;
@@ -129,6 +131,11 @@
   button:disabled {
     cursor: default;
   }
+}
+
+/* a subtree switched to light for export has to re-resolve the inherited text colour too */
+[data-theme='light']:not(html) {
+  color: var(--c-ink);
 }
 
 /* ---------- React Flow ---------- */

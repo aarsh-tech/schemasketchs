@@ -32,7 +32,12 @@ export function Dialogs() {
         initial={dialog?.type === 'import' ? dialog : {}}
         onClose={close}
       />
-      <ExportCodeDialog open={dialog?.type === 'export-code'} onClose={close} />
+      <ExportCodeDialog
+        key={dialog?.type === 'export-code' ? `export:${dialog.format ?? ''}` : 'export:closed'}
+        open={dialog?.type === 'export-code'}
+        initialFormat={dialog?.type === 'export-code' ? dialog.format : undefined}
+        onClose={close}
+      />
       <HelpDialog open={dialog?.type === 'help'} onClose={close} />
       <DeleteProjectDialog projectId={dialog?.type === 'delete-project' ? dialog.projectId : null} onClose={close} />
       <SharedLinkDialog dialog={dialog?.type === 'shared-link' ? dialog : null} onClose={close} />
@@ -269,6 +274,9 @@ const CODE_FORMATS: ({ value: CodeFormat; label: string } | 'separator')[] = [
   { value: 'typescript', label: 'TypeScript' },
   { value: 'zod', label: 'Zod' },
   'separator',
+  { value: 'mermaid', label: 'Mermaid' },
+  { value: 'markdown', label: 'Markdown docs' },
+  'separator',
   { value: 'dbml', label: 'DBML' },
   { value: 'project', label: 'Project JSON' },
 ]
@@ -292,9 +300,9 @@ function targetFor(databaseType: string | null): OrmTarget {
   return 'postgres'
 }
 
-function ExportCodeDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+function ExportCodeDialog({ open, initialFormat, onClose }: { open: boolean; initialFormat?: CodeFormat; onClose: () => void }) {
   const databaseType = useUi((s) => s.model.databaseType)
-  const [format, setFormat] = useState<CodeFormat>('postgres')
+  const [format, setFormat] = useState<CodeFormat>(initialFormat ?? 'postgres')
   // null follows the schema's database_type until someone picks a target
   const [picked, setPicked] = useState<OrmTarget | null>(null)
   const targets = TARGETS[format]
@@ -324,7 +332,13 @@ function ExportCodeDialog({ open, onClose }: { open: boolean; onClose: () => voi
       onClose={onClose}
       width={760}
       title="Export code"
-      description="Generated from the schema in the editor. Fix any errors there first."
+      description={
+        format === 'mermaid'
+          ? 'A Mermaid erDiagram. Paste it inside a ```mermaid block and GitHub or GitLab draws it.'
+          : format === 'markdown'
+            ? 'A data dictionary: every table with its columns, types, keys, notes and relationships, with a Mermaid diagram on top.'
+            : 'Generated from the schema in the editor. Fix any errors there first.'
+      }
       footer={
         <>
           <Button variant="outline" disabled={!code || !!error} onClick={() => copyText(code, 'Copied to clipboard')}>
@@ -412,6 +426,7 @@ const SHORTCUTS: [string, string][] = [
   ['Relate two columns', 'Drag a column’s dot onto another'],
   ['Delete a selected relationship', 'Delete'],
   ['Undo a diagram edit', 'Ctrl / ⌘ + Z in the editor'],
+  ['Undo or redo a table move', 'Ctrl / ⌘ + Z, Ctrl / ⌘ + Shift + Z on the canvas'],
   ['Focus on a table and its neighbours', 'Right-click it, then Focus'],
   ['Leave focus mode', 'Esc'],
 ]

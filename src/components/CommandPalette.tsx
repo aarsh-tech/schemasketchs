@@ -6,6 +6,7 @@ import {
   Database,
   FileCode,
   FilePlus,
+  FileText,
   FolderOpen,
   GitCompareArrows,
   Grid2x2Plus,
@@ -29,7 +30,7 @@ import {
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { KeyboardEvent, ReactNode } from 'react'
 import { addTable, goToTable } from '@/components/canvas/editing'
-import { downloadCode, downloadImage, newProject, openFromDisk, save, share } from '@/lib/actions'
+import { downloadCode, downloadImage, downloadPdf, newProject, openFromDisk, save, share } from '@/lib/actions'
 import { cx } from '@/lib/cx'
 import { rank } from '@/lib/search'
 import { useDialogs } from '@/store/dialogs'
@@ -152,6 +153,9 @@ function PaletteBody({ initialMode, onClose }: { initialMode: 'all' | 'focus'; o
       cmd('new-view', 'New view…', <Layers size={14} />, () => dialogs.open({ type: 'view' }), { keywords: 'subset tab' }),
       cmd('export-png', 'Export PNG image', <Image size={14} />, () => void downloadImage(rf.getNodes(), 'png'), { keywords: 'download picture' }),
       cmd('export-svg', 'Export SVG image', <Image size={14} />, () => void downloadImage(rf.getNodes(), 'svg'), { keywords: 'download picture vector' }),
+      cmd('export-pdf', 'Export PDF', <FileText size={14} />, () => void downloadPdf(rf.getNodes()), { keywords: 'download print page' }),
+      cmd('export-mermaid', 'Export Mermaid diagram…', <FileCode size={14} />, () => dialogs.open({ type: 'export-code', format: 'mermaid' }), { keywords: 'erdiagram github markdown' }),
+      cmd('export-markdown', 'Export Markdown data dictionary…', <FileText size={14} />, () => dialogs.open({ type: 'export-code', format: 'markdown' }), { keywords: 'docs documentation readme' }),
       cmd('export-code', 'Export code…', <Database size={14} />, () => dialogs.open({ type: 'export-code' }), { keywords: 'sql prisma drizzle typescript zod postgres mysql' }),
       cmd('export-dbml', 'Download DBML file', <FileCode size={14} />, () => void downloadCode('dbml'), { keywords: 'export' }),
       cmd('export-project', 'Download project file (with layout)', <FileCode size={14} />, () => void downloadCode('project'), { keywords: 'export json' }),

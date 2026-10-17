@@ -18,7 +18,9 @@ import { useCanvas } from '@/store/canvas'
 import { activeViewOf, positionsOf, useProjects } from '@/store/projects'
 import type { XY } from '@/store/projects'
 import type { SchemaModel } from '@/lib/dbml/types'
+import { makeStep } from '@/lib/layoutHistory'
 import { tablesWithin } from '@/lib/search'
+import { useLayoutHistory } from '@/store/layoutHistory'
 import { viewModel } from '@/lib/views'
 import { useUi } from '@/store/ui'
 import { CanvasOverlays } from './CanvasOverlays'
@@ -112,22 +114,64 @@ export function DiagramCanvas() {
   }
 
   /* ---- auto layout ---- */
+  /** Move nodes to `positions`, on screen and in the saved layout. */
+  const applyLayout = useCallback((positions: Record<string, XY>) => {
+    setNodes((prev) =>
+      refreshGroups(
+        modelRef.current,
+        prev.map((n) => (positions[n.id] ? { ...n, position: positions[n.id] } : n)),
+      ),
+    )
+    useProjects.getState().setPositions(positions)
+  }, [])
+
+  /** Undo stacks are kept per project and per view. */
+  const historyKey = `${activeId}:${view?.id ?? ''}`
+  const historyKeyRef = useRef(historyKey)
+  useEffect(() => {
+    historyKeyRef.current = historyKey
+  })
+  const remember = useCallback((before: Record<string, XY>, after: Record<string, XY>) => {
+    const step = makeStep(before, after)
+    if (step) useLayoutHistory.getState().record(historyKeyRef.current, step)
+  }, [])
+  const stepLayout = useCallback(
+    (dir: 'undo' | 'redo') => {
+      const positions = useLayoutHistory.getState().take(historyKeyRef.current, dir)
+      if (positions) applyLayout(positions)
+    },
+    [applyLayout],
+  )
+
   const runLayout = useCallback(
-    async (fit = true) => {
+    async (fit = true, undoable = false) => {
       const current = rf.getNodes().filter((n) => n.type !== 'tableGroup')
       if (!current.length) return
+      const before = Object.fromEntries(current.map((n) => [n.id, { x: Math.round(n.position.x), y: Math.round(n.position.y) }]))
       const positions = await autoLayout(modelRef.current, current)
-      setNodes((prev) =>
-        refreshGroups(
-          modelRef.current,
-          prev.map((n) => (positions[n.id] ? { ...n, position: positions[n.id] } : n)),
-        ),
-      )
-      useProjects.getState().setPositions(positions)
+      applyLayout(positions)
+      // the first automatic layout of a new schema isn't something to undo back from
+      if (undoable) remember(before, positions)
       if (fit) requestAnimationFrame(() => rf.fitView({ padding: 0.12, duration: 300, maxZoom: 1.1 }))
     },
-    [rf],
+    [rf, applyLayout, remember],
   )
+
+  // Ctrl/⌘+Z and Ctrl/⌘+Shift+Z (or Ctrl+Y) move tables back and forth, unless the editor or a form has focus
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey) return
+      const key = e.key.toLowerCase()
+      if (key !== 'z' && key !== 'y') return
+      const t = e.target as HTMLElement | null
+      if (t?.closest('.cm-editor, input, textarea, select, [contenteditable="true"], dialog') || document.querySelector('dialog[open]')) return
+      if (!wrapper.current?.isConnected || wrapper.current.closest('[inert]')) return
+      e.preventDefault()
+      stepLayout(key === 'y' || e.shiftKey ? 'redo' : 'undo')
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [stepLayout])
 
   const centerOnNode = useCallback(
     (id: string) => {
@@ -158,7 +202,7 @@ export function DiagramCanvas() {
   }, [nodesInitialized, nodes, runLayout, rf, centerOnNode])
 
   useEffect(() => {
-    if (layoutRequest) void runLayout(true)
+    if (layoutRequest) void runLayout(true, true)
   }, [layoutRequest, runLayout])
 
   useEffect(() => {
@@ -175,14 +219,23 @@ export function DiagramCanvas() {
     })
   }, [])
 
-  const onNodeDragStop: OnNodeDrag<AnyNode> = useCallback((_e, _node, dragged) => {
-    const update: Record<string, XY> = {}
-    for (const n of dragged) {
-      if (n.type === 'tableGroup') continue
-      update[n.id] = { x: Math.round(n.position.x), y: Math.round(n.position.y) }
-    }
-    useProjects.getState().setPositions(update)
+  const dragFrom = useRef<Record<string, XY>>({})
+  const onNodeDragStart: OnNodeDrag<AnyNode> = useCallback((_e, _node, dragged) => {
+    dragFrom.current = Object.fromEntries(dragged.map((n) => [n.id, { x: Math.round(n.position.x), y: Math.round(n.position.y) }]))
   }, [])
+
+  const onNodeDragStop: OnNodeDrag<AnyNode> = useCallback(
+    (_e, _node, dragged) => {
+      const update: Record<string, XY> = {}
+      for (const n of dragged) {
+        if (n.type === 'tableGroup') continue
+        update[n.id] = { x: Math.round(n.position.x), y: Math.round(n.position.y) }
+      }
+      useProjects.getState().setPositions(update)
+      remember(dragFrom.current, update)
+    },
+    [remember],
+  )
 
   const onNodeClick: NodeMouseHandler<AnyNode> = useCallback((_e, node) => {
     if (node.type === 'table') setSelectedId(node.id)
@@ -317,6 +370,7 @@ export function DiagramCanvas() {
         edgeTypes={edgeTypes}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
+        onNodeDragStart={onNodeDragStart}
         onNodeDragStop={onNodeDragStop}
         onNodeClick={onNodeClick}
         onNodeContextMenu={onNodeContextMenu}
@@ -362,7 +416,7 @@ export function DiagramCanvas() {
             style={{ width: 168, height: 112 }}
           />
         ) : null}
-        <CanvasToolbar onLayout={() => void runLayout(true)} />
+        <CanvasToolbar onLayout={() => void runLayout(true, true)} onStep={stepLayout} historyKey={historyKey} />
         {focusMode && focusSet ? <FocusBar focus={focusMode} shown={focusSet.size} /> : null}
       </ReactFlow>
       {emptyView ? <EmptyView viewId={view.id} /> : isEmpty ? <EmptyCanvas /> : null}

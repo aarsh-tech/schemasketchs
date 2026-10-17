@@ -6,6 +6,7 @@ import {
   Database,
   FileCode,
   FilePlus,
+  FileText,
   FolderOpen,
   GitCompareArrows,
   History,
@@ -21,7 +22,7 @@ import {
   Upload,
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import { downloadCode, downloadImage, newProject, openFromDisk, save, share } from '@/lib/actions'
+import { downloadCode, downloadImage, downloadPdf, newProject, openFromDisk, save, share } from '@/lib/actions'
 import { getLinkedFile } from '@/lib/files'
 import { useDialogs } from '@/store/dialogs'
 import { useProjects } from '@/store/projects'
@@ -167,8 +168,11 @@ export function TopBar() {
     { heading: 'Picture' },
     { label: 'PNG image', icon: <Image size={14} />, onSelect: () => void downloadImage(rf.getNodes(), 'png') },
     { label: 'SVG image', icon: <Image size={14} />, onSelect: () => void downloadImage(rf.getNodes(), 'svg') },
+    { label: 'PDF, fitted to a page', icon: <FileText size={14} />, onSelect: () => void downloadPdf(rf.getNodes()) },
     { heading: 'Code' },
     { label: 'SQL, Prisma, Drizzle, types…', icon: <Database size={14} />, onSelect: () => useDialogs.getState().open({ type: 'export-code' }) },
+    { label: 'Mermaid diagram', icon: <FileCode size={14} />, onSelect: () => useDialogs.getState().open({ type: 'export-code', format: 'mermaid' }) },
+    { label: 'Markdown data dictionary', icon: <FileText size={14} />, onSelect: () => useDialogs.getState().open({ type: 'export-code', format: 'markdown' }) },
     { label: 'DBML file', icon: <FileCode size={14} />, onSelect: () => void downloadCode('dbml') },
     { label: 'Project file (with layout)', icon: <FileCode size={14} />, onSelect: () => void downloadCode('project') },
   ]

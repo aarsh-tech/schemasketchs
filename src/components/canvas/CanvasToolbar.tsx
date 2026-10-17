@@ -1,11 +1,16 @@
 import { Panel, useReactFlow, useViewport } from '@xyflow/react'
-import { Grid2x2Plus, Map as MapIcon, Maximize, Minus, Network, Plus } from 'lucide-react'
+import { Grid2x2Plus, Map as MapIcon, Maximize, Minus, Network, Plus, Redo2, Undo2 } from 'lucide-react'
 import { Button, IconButton, Segmented } from '@/components/ui/primitives'
+import { useLayoutHistory } from '@/store/layoutHistory'
 import { useUi } from '@/store/ui'
 import type { DetailLevel } from '@/store/ui'
 import { addTable } from './editing'
 
-export function CanvasToolbar({ onLayout }: { onLayout: () => void }) {
+const mod = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl+'
+
+export function CanvasToolbar({ onLayout, onStep, historyKey }: { onLayout: () => void; onStep: (dir: 'undo' | 'redo') => void; historyKey: string }) {
+  const canUndo = useLayoutHistory((s) => (s.stacks[historyKey]?.past.length ?? 0) > 0)
+  const canRedo = useLayoutHistory((s) => (s.stacks[historyKey]?.future.length ?? 0) > 0)
   const rf = useReactFlow()
   const { zoom } = useViewport()
   const detail = useUi((s) => s.detail)
@@ -41,6 +46,12 @@ export function CanvasToolbar({ onLayout }: { onLayout: () => void }) {
         <div className="mx-1 h-5 w-px bg-line" />
         <IconButton label="Arrange tables automatically" onClick={onLayout}>
           <Network size={15} />
+        </IconButton>
+        <IconButton label={`Undo table move (${mod}Z)`} disabled={!canUndo} onClick={() => onStep('undo')}>
+          <Undo2 size={15} />
+        </IconButton>
+        <IconButton label={`Redo table move (${mod}⇧Z)`} disabled={!canRedo} onClick={() => onStep('redo')} className="max-sm:hidden">
+          <Redo2 size={15} />
         </IconButton>
         <IconButton label={showMinimap ? 'Hide minimap' : 'Show minimap'} active={showMinimap} onClick={toggleMinimap} className="max-sm:hidden">
           <MapIcon size={15} />

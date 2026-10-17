@@ -70,7 +70,7 @@ Today the diagram only reflects the code. Make edits on the canvas write back in
 - Ctrl/⌘+K command palette: jump to a table or column, and run any command (export, layout, theme…).
 - Focus mode: show only the selected table and its neighbours up to N relationships away (1 to 3), and dim or hide the rest.
 
-### - [ ] 9. Undo/redo for the canvas, plus more exports
+### - [x] 9. Undo/redo for the canvas, plus more exports
 
 - Undo and redo for table moves and auto-layout (Ctrl+Z on the canvas, separate from editor undo).
 - Export PDF (fit to page, light theme), Mermaid `erDiagram` (renders in GitHub READMEs) and a Markdown data dictionary (each table, its columns, types, notes and relations).

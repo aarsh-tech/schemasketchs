@@ -1,11 +1,12 @@
 import { create } from 'zustand'
+import type { CodeFormat } from '@/lib/actions'
 import type { ProjectFile } from '@/lib/files'
 
 export type ImportFormat = 'sql' | 'prisma' | 'drizzle' | 'database'
 
 export type DialogState =
   | { type: 'import'; format?: ImportFormat; text?: string; fileName?: string }
-  | { type: 'export-code' }
+  | { type: 'export-code'; format?: CodeFormat }
   | { type: 'help' }
   | { type: 'delete-project'; projectId: string }
   | { type: 'shared-link'; file: ProjectFile }

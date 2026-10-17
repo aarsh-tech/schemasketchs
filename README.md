@@ -26,7 +26,8 @@ Planned features are listed in [ROADMAP.md](ROADMAP.md). Contributions are welco
 - **Import SQL**: PostgreSQL, MySQL, SQL Server, Snowflake, Oracle and Rails `schema.rb`
 - **ORM import and export**: import a Prisma `schema.prisma` or a Drizzle schema file (pg-core, mysql-core or sqlite-core) into DBML, with models, enums, relations, indexes and mapped names. Export the schema as a Prisma schema (PostgreSQL, MySQL or SQLite), a Drizzle schema (pg-core or mysql-core), TypeScript row interfaces or Zod 4 schemas. Anything a format can't hold is called out in a comment rather than silently dropped
 - **Import from a live database, with no connection**: pick PostgreSQL, MySQL, SQLite or SQL Server and copy a ready-made read-only catalog query. Run it in your own client and paste back the JSON it returns (or drop the saved `.json` file): tables, columns, types, defaults, primary and foreign keys, indexes, enums and comments become DBML. Schemasketch never connects to the database
-- **Export**: PNG, SVG, SQL (PostgreSQL, MySQL, SQL Server, Oracle), Prisma, Drizzle, TypeScript, Zod, DBML, project JSON
+- **Export**: PNG, SVG, PDF (fitted to an A4 page, always in the light theme), SQL (PostgreSQL, MySQL, SQL Server, Oracle), Prisma, Drizzle, TypeScript, Zod, a Mermaid `erDiagram` that GitHub renders, a Markdown data dictionary (every table, column, type, key, note and relationship, with the Mermaid diagram on top), DBML, project JSON
+- **Canvas undo and redo**: Ctrl/⌘+Z and Ctrl/⌘+Shift+Z (or the toolbar arrows) step through table moves and auto-layouts, separately from the editor's own undo
 - **Share links**: the whole schema is compressed into the URL hash, so no server is involved
 - **Drag and drop** a file anywhere on the window to open it: `.dbml`, `.sql`, `schema.rb`, `.prisma`, a Drizzle `.ts` file, a project `.json` or a database catalog result `.json`. The format is detected and the right import tab opens
 - Light and dark themes, works on phones
@@ -78,6 +79,7 @@ npx netlify-cli deploy --prod --dir dist
 | Edit a column | Click it |
 | Delete the selected relationship | Delete |
 | Undo a diagram edit | Ctrl/⌘ + Z in the editor |
+| Undo or redo a table move | Ctrl/⌘ + Z, Ctrl/⌘ + Shift + Z on the canvas |
 | Focus on a table | Right-click it → Focus on this table |
 | Leave focus mode | Esc |
 
@@ -103,6 +105,7 @@ src/
   lib/lint/           schema checks, one file per rule (pure, run after each parse)
   lib/views.ts        views: a named list of tables with its own layout, and the filtered model the canvas draws
   lib/search.ts       fuzzy matching for the command palette, and neighbourhoods for focus mode
+  lib/layoutHistory.ts undo/redo steps for table positions; lib/pdf.ts writes a one-page PDF around a JPEG
   lib/files.ts        File System Access API with download fallbacks, share-link encoding
 ```
 

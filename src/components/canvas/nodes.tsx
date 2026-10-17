@@ -159,7 +159,7 @@ function ProblemBadge({ tableId }: { tableId: string }) {
       type="button"
       title={summary}
       aria-label={`${problems.length} ${problems.length === 1 ? 'problem' : 'problems'} found by the schema checks. Show in the code`}
-      className="nodrag inline-flex h-5 shrink-0 items-center gap-0.5 rounded-full border border-warn/40 bg-warn-soft px-1.5 font-mono text-[10.5px] font-semibold text-warn"
+      className="ss-export-hide nodrag inline-flex h-5 shrink-0 items-center gap-0.5 rounded-full border border-warn/40 bg-warn-soft px-1.5 font-mono text-[10.5px] font-semibold text-warn"
       onClick={(e) => {
         e.stopPropagation()
         useUi.getState().revealTable(tableId, problems[0].column)

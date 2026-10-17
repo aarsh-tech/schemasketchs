@@ -31,3 +31,7 @@ Also fixed: auto-layout after switching projects or views could run before table
 ## Search and focus mode (#8)
 A command palette (Ctrl/⌘+K, or the search button in the top bar) fuzzy-finds tables and columns, centring the canvas on them and selecting them in the code, and runs every app command: exports, layout, views, version history, theme and more.
 Focus mode, from a table's menu or the palette, shows one table and its neighbours up to 1 to 3 relationships away, dimming or hiding the rest, with a bar to change depth and Esc to leave. `src/lib/search.ts` holds the matching and neighbourhood walk, with 9 Vitest tests.
+
+## Canvas undo/redo and more exports (#9)
+Table moves and auto-layouts can be undone and redone with Ctrl/⌘+Z and Ctrl/⌘+Shift+Z on the canvas or the toolbar arrows, per schema and view and separate from the editor's undo.
+New exports: PDF fitted to an A4 page in the light theme (written by a small built-in PDF writer, no library), a Mermaid `erDiagram`, and a Markdown data dictionary with the diagram embedded. 12 Vitest tests, including Mermaid's own parser accepting every fixture.

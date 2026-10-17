@@ -4,13 +4,15 @@ import { fromDrizzle, toDrizzle } from './drizzle'
 import type { DrizzleDialect } from './drizzle'
 import { fromPrisma, toPrisma } from './prisma'
 import type { PrismaProvider } from './prisma'
+import { toMarkdown } from './markdown'
+import { toMermaid } from './mermaid'
 import { toTypeScript, toZod } from './typescript'
 
 /* Entry point for the ORM converters. The app loads this module with a
    dynamic import(), so none of it is in the main bundle. */
 
 export type OrmImportFormat = 'prisma' | 'drizzle'
-export type OrmExportFormat = 'prisma' | 'drizzle' | 'typescript' | 'zod'
+export type OrmExportFormat = 'prisma' | 'drizzle' | 'typescript' | 'zod' | 'mermaid' | 'markdown'
 export type OrmTarget = 'postgres' | 'mysql' | 'sqlite'
 
 export { drizzleDialectFor } from './drizzle'
@@ -31,7 +33,7 @@ export function importOrm(format: OrmImportFormat, text: string): OrmImport {
 
 const PRISMA_PROVIDER: Record<OrmTarget, PrismaProvider> = { postgres: 'postgresql', mysql: 'mysql', sqlite: 'sqlite' }
 
-export function exportOrm(format: OrmExportFormat, model: SchemaModel, target: OrmTarget): string {
+export function exportOrm(format: OrmExportFormat, model: SchemaModel, target: OrmTarget, opts: { title?: string } = {}): string {
   switch (format) {
     case 'prisma':
       return toPrisma(model, { provider: PRISMA_PROVIDER[target] })
@@ -41,5 +43,9 @@ export function exportOrm(format: OrmExportFormat, model: SchemaModel, target: O
       return toTypeScript(model)
     case 'zod':
       return toZod(model)
+    case 'mermaid':
+      return toMermaid(model)
+    case 'markdown':
+      return toMarkdown(model, { title: opts.title })
   }
 }

@@ -9,6 +9,7 @@ import { renderDiagram } from '@/lib/exportImage'
 import {
   baseName,
   buildShareUrl,
+  downloadBlob,
   downloadDataUrl,
   downloadText,
   guessKind,
@@ -212,7 +213,7 @@ export async function importSchema(format: ImportFormat, text: string, opts: { d
 
 export type CodeFormat = SqlDialect | OrmExportFormat | 'dbml' | 'project'
 
-const ORM_FORMATS = new Set<CodeFormat>(['prisma', 'drizzle', 'typescript', 'zod'])
+const ORM_FORMATS = new Set<CodeFormat>(['prisma', 'drizzle', 'typescript', 'zod', 'mermaid', 'markdown'])
 
 /** Code for the current schema. `target` picks the database for Prisma and Drizzle. */
 export async function generateCode(format: CodeFormat, target: OrmTarget = 'postgres'): Promise<string> {
@@ -226,7 +227,7 @@ export async function generateCode(format: CodeFormat, target: OrmTarget = 'post
       const d = diagnostics[0]
       throw new Error(`The schema has an error on line ${d?.line ?? 1}: ${d?.message ?? 'unknown'}`)
     }
-    return exportOrm(format as OrmExportFormat, model, target)
+    return exportOrm(format as OrmExportFormat, model, target, { title: p.name })
   }
   return exportSql(p.source, format as SqlDialect)
 }
@@ -245,6 +246,10 @@ function codeFileName(format: CodeFormat, base: string): [name: string, type: st
       return [`${base}.types.ts`, 'text/typescript']
     case 'zod':
       return [`${base}.zod.ts`, 'text/typescript']
+    case 'mermaid':
+      return [`${base}.mmd`, 'text/plain']
+    case 'markdown':
+      return [`${base}.md`, 'text/markdown']
     default:
       return [`${base}.${format}.sql`, 'application/sql']
   }
@@ -260,6 +265,32 @@ export async function downloadCode(format: CodeFormat, target?: OrmTarget) {
   } catch (err) {
     toast.error('Could not export', { description: errorText(err) })
   }
+}
+
+/** A light-theme PDF of the whole diagram, fitted to an A4 page. */
+export async function downloadPdf(nodes: Node[]) {
+  const p = active()
+  if (!p) return
+  const id = toast.loading('Rendering PDF…')
+  try {
+    const [{ imagePdf }, url] = await Promise.all([import('@/lib/pdf'), renderDiagram(nodes, 'jpeg', { light: true })])
+    const size = await imageSize(url)
+    const bytes = Uint8Array.from(atob(url.slice(url.indexOf(',') + 1)), (c) => c.charCodeAt(0))
+    const pdf = imagePdf({ jpeg: bytes, ...size }, p.name)
+    downloadBlob(new Blob([pdf as BlobPart], { type: 'application/pdf' }), `${slug(p.name)}.pdf`)
+    toast.success(`Downloaded ${slug(p.name)}.pdf`, { id })
+  } catch (err) {
+    toast.error('Could not export the PDF', { id, description: errorText(err) })
+  }
+}
+
+function imageSize(url: string): Promise<{ width: number; height: number }> {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight })
+    img.onerror = () => reject(new Error('The rendered image could not be read.'))
+    img.src = url
+  })
 }
 
 export async function downloadImage(nodes: Node[], format: 'png' | 'svg') {
