@@ -260,6 +260,11 @@ const SHORTCUTS: [string, string][] = [
   ['Zoom canvas', 'Ctrl / ⌘ + scroll, or pinch'],
   ['Select several tables', 'Shift + drag'],
   ['Jump to a table in the editor', 'Double-click it'],
+  ['Table actions (rename, colour, delete)', 'Right-click it'],
+  ['Edit a column', 'Click it'],
+  ['Relate two columns', 'Drag a column’s dot onto another'],
+  ['Delete a selected relationship', 'Delete'],
+  ['Undo a diagram edit', 'Ctrl / ⌘ + Z in the editor'],
 ]
 
 function HelpDialog({ open, onClose }: { open: boolean; onClose: () => void }) {

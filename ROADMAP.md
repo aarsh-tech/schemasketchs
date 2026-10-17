@@ -8,7 +8,7 @@ The aim: **the schema tool that fits a developer's real codebase**, with schema 
 
 ## Phase 1: what sets it apart
 
-### - [ ] 1. Two-way visual editing
+### - [x] 1. Two-way visual editing
 Today the diagram only reflects the code. Make edits on the canvas write back into the DBML text.
 - Right-click a table for a menu: rename table, add column, delete table, change header color.
 - Click a column to edit its name, type, pk, unique, not null and default in a small popover.
@@ -92,6 +92,6 @@ Today the diagram only reflects the code. Make edits on the canvas write back in
 ---
 
 ## Housekeeping (anytime)
-- [ ] Vitest set up with a `pnpm test` script, run in CI
+- [x] Vitest set up with a `pnpm test` script, run in CI
 - [ ] Screenshots and a GIF in the README
 - [ ] CONTRIBUTING.md and issue templates

@@ -86,6 +86,8 @@ export function buildNodes(
       type: 'table',
       position: position(table.id),
       data: { table, fields, hiddenCount: table.fields.length - fields.length, color, highlight: null },
+      // the Delete key only removes relationships; tables are deleted from their menu
+      deletable: false,
       zIndex: 1,
     }
   })
@@ -99,6 +101,7 @@ export function buildNodes(
       position: position(note.id),
       data: { note },
       width: NOTE_WIDTH,
+      deletable: false,
       zIndex: 1,
     }
   })
@@ -125,6 +128,7 @@ export function buildGroups(model: SchemaModel, tableNodes: AnyNode[]): GroupNod
       draggable: false,
       selectable: false,
       focusable: false,
+      deletable: false,
       zIndex: 0,
     })
   }

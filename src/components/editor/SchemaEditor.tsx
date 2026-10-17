@@ -1,32 +1,16 @@
 import { autocompletion } from '@codemirror/autocomplete'
 import { setDiagnostics, lintGutter } from '@codemirror/lint'
-import { EditorView, Decoration } from '@codemirror/view'
-import type { DecorationSet } from '@codemirror/view'
-import { StateEffect, StateField, EditorSelection } from '@codemirror/state'
+import { EditorView } from '@codemirror/view'
+import { EditorSelection } from '@codemirror/state'
 import { indentUnit } from '@codemirror/language'
 import CodeMirror from '@uiw/react-codemirror'
 import type { ReactCodeMirrorRef } from '@uiw/react-codemirror'
 import { useEffect, useMemo, useRef } from 'react'
 import { useProjects } from '@/store/projects'
 import { useUi } from '@/store/ui'
+import { attachEditor, flashEffect, flashField } from './bridge'
 import { dbmlHighlight, dbmlLanguage } from './dbmlLanguage'
 import { dbmlCompletions, findTableLine, tableAtPosition, toCmDiagnostics } from './dbmlTools'
-
-/* A one-shot line highlight used when jumping to a table from the canvas. */
-const flashEffect = StateEffect.define<number | null>()
-const flashField = StateField.define<DecorationSet>({
-  create: () => Decoration.none,
-  update(deco, tr) {
-    deco = deco.map(tr.changes)
-    for (const e of tr.effects) {
-      if (e.is(flashEffect)) {
-        deco = e.value == null ? Decoration.none : Decoration.set([Decoration.line({ class: 'cm-flash-line' }).range(e.value)])
-      }
-    }
-    return deco
-  },
-  provide: (f) => EditorView.decorations.from(f),
-})
 
 const baseTheme = EditorView.theme({
   '&': { color: 'var(--c-ink)' },
@@ -103,6 +87,7 @@ export function SchemaEditor() {
       ref={ref}
       value={initial}
       onChange={(value) => useProjects.getState().setSource(value)}
+      onCreateEditor={attachEditor}
       extensions={extensions}
       theme="none"
       height="100%"

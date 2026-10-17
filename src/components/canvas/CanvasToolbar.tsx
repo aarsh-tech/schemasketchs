@@ -1,8 +1,9 @@
 import { Panel, useReactFlow, useViewport } from '@xyflow/react'
-import { Map as MapIcon, Maximize, Minus, Network, Plus } from 'lucide-react'
-import { IconButton, Segmented } from '@/components/ui/primitives'
+import { Grid2x2Plus, Map as MapIcon, Maximize, Minus, Network, Plus } from 'lucide-react'
+import { Button, IconButton, Segmented } from '@/components/ui/primitives'
 import { useUi } from '@/store/ui'
 import type { DetailLevel } from '@/store/ui'
+import { addTable } from './editing'
 
 export function CanvasToolbar({ onLayout }: { onLayout: () => void }) {
   const rf = useReactFlow()
@@ -15,6 +16,11 @@ export function CanvasToolbar({ onLayout }: { onLayout: () => void }) {
   return (
     <Panel position="bottom-left" className="!m-3 sm:!m-4">
       <div className="flex flex-wrap items-center gap-1 rounded-lg border border-line bg-raised/95 p-1 shadow-table backdrop-blur">
+        <Button onClick={() => void addTable()} title="Add a table in the middle of the view" aria-label="Add table" className="px-2 text-ink">
+          <Grid2x2Plus size={15} />
+          <span className="max-sm:hidden">Add table</span>
+        </Button>
+        <div className="mx-1 h-5 w-px bg-line" />
         <IconButton label="Zoom out" onClick={() => rf.zoomOut({ duration: 150 })}>
           <Minus size={15} />
         </IconButton>

@@ -1,22 +1,30 @@
 import {
   Background,
   BackgroundVariant,
+  ConnectionLineType,
   MiniMap,
   ReactFlow,
   ViewportPortal,
   applyNodeChanges,
+  useConnection,
   useNodesInitialized,
   useReactFlow,
 } from '@xyflow/react'
-import type { NodeChange, NodeMouseHandler, OnNodeDrag } from '@xyflow/react'
+import type { Connection, EdgeChange, IsValidConnection, NodeChange, NodeMouseHandler, OnBeforeDelete, OnConnectEnd, OnNodeDrag } from '@xyflow/react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { MouseEvent as ReactMouseEvent } from 'react'
+import { cx } from '@/lib/cx'
+import { useCanvas } from '@/store/canvas'
 import { useProjects } from '@/store/projects'
 import type { XY } from '@/store/projects'
+import type { SchemaModel } from '@/lib/dbml/types'
 import { useUi } from '@/store/ui'
+import { CanvasOverlays } from './CanvasOverlays'
 import { CanvasToolbar } from './CanvasToolbar'
+import { deleteRelationship, fieldOfHandle, findTable, isDropHandle } from './editing'
 import { EmptyCanvas } from './EmptyCanvas'
 import { MarkerDefs } from './edges'
-import type { AnyNode, TableNode } from './graph'
+import type { AnyNode, RelationEdge, TableNode } from './graph'
 import { buildEdges, buildNodes, refreshGroups, relatedTables } from './graph'
 import { autoLayout, findFreeSpot } from './layout'
 import { edgeTypes, nodeTypes } from './registry'
@@ -36,6 +44,10 @@ export function DiagramCanvas() {
 
   const [nodes, setNodes] = useState<AnyNode[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  // edge ids follow the order of refs in the code, so a selection only holds for the model it was made on
+  const [edgeSelection, setEdgeSelection] = useState<{ id: string; model: SchemaModel } | null>(null)
+  const selectedEdgeId = edgeSelection?.model === model ? edgeSelection.id : null
+  const connecting = useConnection((c) => c.inProgress)
   const nodesInitialized = useNodesInitialized()
   const wrapper = useRef<HTMLDivElement>(null)
 
@@ -156,31 +168,96 @@ export function DiagramCanvas() {
     })
   }, [nodes, focusId, model])
 
-  const edges = useMemo(
-    () => buildEdges(model, nodes, focusId && model.tables.some((t) => t.id === focusId) ? focusId : null),
-    [model, nodes, focusId],
+  const edges = useMemo(() => {
+    const built = buildEdges(model, nodes, focusId && model.tables.some((t) => t.id === focusId) ? focusId : null)
+    return selectedEdgeId ? built.map((e) => (e.id === selectedEdgeId ? { ...e, selected: true, className: undefined } : e)) : built
+  }, [model, nodes, focusId, selectedEdgeId])
+
+  /* ---- editing on the canvas ---- */
+  const onEdgesChange = useCallback((changes: EdgeChange<RelationEdge>[]) => {
+    for (const c of changes) {
+      if (c.type !== 'select') continue
+      if (c.selected) setEdgeSelection({ id: c.id, model: useUi.getState().model })
+      else setEdgeSelection((cur) => (cur?.id === c.id ? null : cur))
+    }
+  }, [])
+
+  // Delete / Backspace on a selected relationship removes it from the code.
+  // Returning false stops React Flow deleting anything itself: the diagram follows the code.
+  const onBeforeDelete: OnBeforeDelete<AnyNode, RelationEdge> = useCallback(async ({ edges: gone }) => {
+    for (const e of gone) if (e.data) await deleteRelationship(e.data.ref)
+    return false
+  }, [])
+
+  const isValidConnection: IsValidConnection<RelationEdge> = useCallback(
+    (c: Connection | RelationEdge) => isDropHandle(c.targetHandle) && !(c.source === c.target && fieldOfHandle(c.sourceHandle) === fieldOfHandle(c.targetHandle)),
+    [],
+  )
+
+  const onConnectEnd: OnConnectEnd = useCallback((event, state) => {
+    if (!state.isValid || !state.fromNode || !state.toNode || !state.fromHandle || !state.toHandle) return
+    const from = { tableId: state.fromNode.id, column: fieldOfHandle(state.fromHandle.id) }
+    const to = { tableId: state.toNode.id, column: fieldOfHandle(state.toHandle.id) }
+    const m = useUi.getState().model
+    const fromField = findTable(m, from.tableId)?.fields.find((f) => f.name === from.column)
+    const toField = findTable(m, to.tableId)?.fields.find((f) => f.name === to.column)
+    // dragging from a key to a plain column reads as "one to many"
+    const fromKey = !!(fromField?.pk || fromField?.unique)
+    const toKey = !!(toField?.pk || toField?.unique)
+    const point = 'changedTouches' in event ? event.changedTouches[0] : event
+    useCanvas.getState().open({ type: 'new-ref', from, to, x: point.clientX + 4, y: point.clientY + 4, suggested: fromKey && !toKey ? '<' : '>' })
+  }, [])
+
+  const onNodeContextMenu: NodeMouseHandler<AnyNode> = useCallback((e, node) => {
+    if (node.type !== 'table') return
+    e.preventDefault()
+    // keyboard context-menu key reports 0,0: anchor to the node instead
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    const x = e.clientX || r.left + 12
+    const y = e.clientY || r.top + 12
+    useCanvas.getState().open({ type: 'table-menu', tableId: node.id, x, y })
+  }, [])
+
+  const onPaneContextMenu = useCallback(
+    (e: MouseEvent | ReactMouseEvent) => {
+      e.preventDefault()
+      useCanvas.getState().open({ type: 'pane-menu', x: e.clientX, y: e.clientY, flow: rf.screenToFlowPosition({ x: e.clientX, y: e.clientY }) })
+    },
+    [rf],
   )
 
   const isEmpty = model.tables.length === 0 && model.notes.length === 0
 
   return (
-    <div ref={wrapper} className="relative h-full w-full" data-testid="diagram">
-      <ReactFlow<AnyNode>
+    <div ref={wrapper} className={cx('relative h-full w-full', connecting && 'is-connecting')} data-testid="diagram">
+      <ReactFlow<AnyNode, RelationEdge>
         nodes={displayNodes}
         edges={edges}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
         onNodeDragStop={onNodeDragStop}
         onNodeClick={onNodeClick}
+        onNodeContextMenu={onNodeContextMenu}
+        onPaneContextMenu={onPaneContextMenu}
         onPaneClick={() => setSelectedId(null)}
-        nodesConnectable={false}
-        edgesFocusable={false}
+        onMoveStart={(e) => {
+          if (e) useCanvas.getState().close()
+        }}
+        onBeforeDelete={onBeforeDelete}
+        isValidConnection={isValidConnection}
+        onConnectEnd={onConnectEnd}
+        connectionLineType={ConnectionLineType.SmoothStep}
+        connectionLineStyle={{ stroke: 'var(--c-accent)', strokeWidth: 1.8 }}
+        connectionRadius={24}
+        nodesConnectable
+        edgesFocusable
         elevateNodesOnSelect={false}
         minZoom={0.1}
         maxZoom={2.5}
         proOptions={{ hideAttribution: true }}
-        deleteKeyCode={null}
+        deleteKeyCode={['Delete', 'Backspace']}
         selectionKeyCode="Shift"
         multiSelectionKeyCode={['Meta', 'Control']}
         panOnScroll
@@ -208,6 +285,7 @@ export function DiagramCanvas() {
         <CanvasToolbar onLayout={() => void runLayout(true)} />
       </ReactFlow>
       {isEmpty ? <EmptyCanvas /> : null}
+      <CanvasOverlays />
     </div>
   )
 }

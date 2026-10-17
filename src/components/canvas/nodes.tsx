@@ -1,10 +1,12 @@
 import { Handle, Position } from '@xyflow/react'
 import type { NodeProps } from '@xyflow/react'
-import { KeyRound, Link2 } from 'lucide-react'
+import { Ellipsis, KeyRound, Link2 } from 'lucide-react'
 import { memo } from 'react'
 import type { FieldModel } from '@/lib/dbml/types'
 import { readableText } from '@/lib/color'
+import { useCanvas } from '@/store/canvas'
 import { useUi } from '@/store/ui'
+import { cancelPendingClick, connectHandleId, dropHandleId, openColumn, openColumnSoon } from './editing'
 import type { GroupNode, NoteNode, TableNode } from './graph'
 import { handleId } from './graph'
 import { GROUP_LABEL_H, HEADER_H, ROW_H, TABLE_WIDTH } from './layout'
@@ -34,14 +36,36 @@ function describeField(f: FieldModel): string {
   return bits.join('\n')
 }
 
-function FieldRow({ field }: { field: FieldModel }) {
+/** Drag from a dot to another column to relate them; the whole row accepts the drop. */
+function ConnectHandles({ field }: { field: string }) {
+  return (
+    <>
+      <Handle type="target" position={Position.Left} id={dropHandleId(field)} className="ss-drop" isConnectableStart={false} />
+      <Handle type="source" position={Position.Left} id={connectHandleId(field, 'l')} className="ss-connect" isConnectableEnd={false} title="Drag to another column to relate them" />
+      <Handle type="source" position={Position.Right} id={connectHandleId(field, 'r')} className="ss-connect" isConnectableEnd={false} title="Drag to another column to relate them" />
+    </>
+  )
+}
+
+function FieldRow({ tableId, field }: { tableId: string; field: FieldModel }) {
   return (
     <div
-      className="relative flex items-center gap-2 border-t border-line/70 px-3 text-[12.5px] hover:bg-(--c-table-row-hover)"
+      role="button"
+      tabIndex={0}
+      aria-label={`Edit column ${field.name}`}
+      className="ss-row relative flex cursor-pointer items-center gap-2 border-t border-line/70 px-3 text-[12.5px] outline-none hover:bg-(--c-table-row-hover) focus-visible:bg-(--c-table-row-hover) focus-visible:shadow-[inset_2px_0_0_var(--c-accent)]"
       style={{ height: ROW_H }}
       title={describeField(field)}
+      onClick={(e) => openColumnSoon(tableId, field.name, e.currentTarget)}
+      onKeyDown={(e) => {
+        if (e.key !== 'Enter' && e.key !== ' ') return
+        e.preventDefault()
+        e.stopPropagation()
+        openColumn(tableId, field.name, e.currentTarget)
+      }}
     >
       <RowHandles field={field.name} />
+      <ConnectHandles field={field.name} />
       <span className="flex w-3.5 shrink-0 justify-center" aria-hidden>
         {field.pk ? (
           <KeyRound size={13} strokeWidth={2.4} className="text-key" />
@@ -78,18 +102,36 @@ export const TableNodeView = memo(function TableNodeView({ data, selected }: Nod
       }}
       onMouseEnter={() => useUi.getState().setHoveredTable(table.id)}
       onMouseLeave={() => useUi.getState().setHoveredTable(null)}
-      onDoubleClick={() => useUi.getState().revealTable(table.id)}
+      onDoubleClick={() => {
+        cancelPendingClick()
+        useCanvas.getState().close()
+        useUi.getState().revealTable(table.id)
+      }}
     >
-      <div className="relative flex items-center gap-2 px-3" style={{ height: HEADER_H, background: color, color: readableText(color) }}>
+      <div className="relative flex items-center gap-2 pr-1 pl-3" style={{ height: HEADER_H, background: color, color: readableText(color) }}>
         <RowHandles field={null} />
         <span className="min-w-0 flex-1 truncate text-[13.5px] font-semibold tracking-[-0.01em]">
           {table.schema ? <span className="font-normal opacity-75">{table.schema}.</span> : null}
           {table.name}
         </span>
         {table.alias ? <span className="shrink-0 font-mono text-[11px] opacity-75">as {table.alias}</span> : null}
+        <button
+          type="button"
+          aria-label={`Actions for ${table.name}`}
+          title="Table actions"
+          className="ss-table-menu nodrag inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md hover:bg-current/15 focus-visible:opacity-100"
+          onClick={(e) => {
+            e.stopPropagation()
+            const r = e.currentTarget.getBoundingClientRect()
+            useCanvas.getState().open({ type: 'table-menu', tableId: table.id, x: r.left, y: r.bottom + 4 })
+          }}
+          onDoubleClick={(e) => e.stopPropagation()}
+        >
+          <Ellipsis size={15} />
+        </button>
       </div>
       {fields.map((f) => (
-        <FieldRow key={f.name} field={f} />
+        <FieldRow key={f.name} tableId={table.id} field={f} />
       ))}
       {hiddenCount > 0 && fields.length > 0 ? (
         <div className="border-t border-line/70 px-3 py-1 text-[11px] text-ink-3">

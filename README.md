@@ -9,6 +9,7 @@ Planned features are listed in [ROADMAP.md](ROADMAP.md). Contributions are welco
 ## Features
 
 - **Live diagram**: type DBML on the left, tables and relationships redraw on the right as you type
+- **Two-way visual editing**: right-click a table to rename it, add a column, change its header colour or delete it; click a column to edit its name, type, keys, null and default; drag from a column's dot to another column to create a relationship; select a relationship and press Delete to remove it; add tables from the toolbar. Every change is written into the DBML with minimal edits that keep your comments and formatting, and Ctrl+Z in the editor undoes it
 - **Proper ER notation**: crow's-foot markers for one, zero-or-one, many and zero-or-many
 - **Editor**: DBML syntax highlighting, inline errors, autocomplete for keywords, types, tables and columns
 - **Canvas**: drag tables, auto-arrange (ELK layered layout), table groups, sticky notes, minimap, zoom
@@ -38,6 +39,7 @@ pnpm build      # type-check and build to dist/
 pnpm preview    # serve the production build locally
 pnpm lint       # oxlint
 pnpm typecheck  # tsc only
+pnpm test       # unit tests (Vitest)
 ```
 
 ## Deploy to Netlify
@@ -63,6 +65,10 @@ npx netlify-cli deploy --prod --dir dist
 | Autocomplete | Ctrl + Space |
 | Zoom canvas | Ctrl/⌘ + scroll, or pinch |
 | Select several tables | Shift + drag |
+| Table actions | Right-click a table |
+| Edit a column | Click it |
+| Delete the selected relationship | Delete |
+| Undo a diagram edit | Ctrl/⌘ + Z in the editor |
 
 ## How it works
 

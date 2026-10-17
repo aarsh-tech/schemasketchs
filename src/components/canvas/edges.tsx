@@ -1,7 +1,9 @@
 import { BaseEdge, EdgeLabelRenderer, getSmoothStepPath } from '@xyflow/react'
 import type { EdgeProps } from '@xyflow/react'
+import { Trash2 } from 'lucide-react'
 import { memo, useState } from 'react'
 import type { Cardinality } from '@/lib/dbml/types'
+import { deleteRelationship } from './editing'
 import type { RelationEdge } from './graph'
 
 /* ----- crow's foot markers -----
@@ -52,10 +54,10 @@ export function MarkerDefs() {
 const WORD: Record<Cardinality, string> = { one: 'one', 'zero-one': 'zero or one', many: 'many', 'zero-many': 'zero or many' }
 
 export const RelationEdgeView = memo(function RelationEdgeView(props: EdgeProps<RelationEdge>) {
-  const { id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, data } = props
+  const { id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, data, selected } = props
   const [hover, setHover] = useState(false)
   if (!data) return null
-  const active = data.active || hover
+  const active = data.active || hover || !!selected
 
   const [path, labelX, labelY] = getSmoothStepPath({
     sourceX,
@@ -83,7 +85,7 @@ export const RelationEdgeView = memo(function RelationEdgeView(props: EdgeProps<
         markerEnd={`url(#${markerId(data.targetCardinality, active)})`}
         style={{
           stroke: active ? 'var(--c-edge-active)' : 'var(--c-edge)',
-          strokeWidth: active ? 1.9 : 1.5,
+          strokeWidth: selected ? 2.4 : active ? 1.9 : 1.5,
         }}
       />
       <path
@@ -95,10 +97,10 @@ export const RelationEdgeView = memo(function RelationEdgeView(props: EdgeProps<
         onMouseLeave={() => setHover(false)}
         style={{ pointerEvents: 'stroke' }}
       />
-      {hover ? (
+      {hover || selected ? (
         <EdgeLabelRenderer>
           <div
-            className="pointer-events-none absolute z-50 max-w-80 rounded-md border border-line bg-raised px-2.5 py-1.5 text-[12px] shadow-pop"
+            className={`absolute z-50 max-w-80 rounded-md border border-line bg-raised px-2.5 py-1.5 text-[12px] shadow-pop ${selected ? 'nodrag nopan pointer-events-auto' : 'pointer-events-none'}`}
             style={{ transform: `translate(-50%, calc(-100% - 10px)) translate(${labelX}px, ${labelY}px)` }}
           >
             <div className="font-mono text-[11.5px] text-ink">
@@ -109,6 +111,16 @@ export const RelationEdgeView = memo(function RelationEdgeView(props: EdgeProps<
               {ref.name ? `, ${ref.name}` : ''}
               {actions.length ? ` · ${actions.join(', ')}` : ''}
             </div>
+            {selected ? (
+              <button
+                type="button"
+                onClick={() => void deleteRelationship(ref)}
+                className="mt-1.5 inline-flex h-7 items-center gap-1.5 rounded-md border border-line-strong px-2 text-[12px] font-medium text-danger hover:bg-danger-soft"
+              >
+                <Trash2 size={13} /> Delete relationship
+                <span className="ml-1 font-mono text-[10.5px] text-ink-3 max-sm:hidden">Del</span>
+              </button>
+            ) : null}
           </div>
         </EdgeLabelRenderer>
       ) : null}
