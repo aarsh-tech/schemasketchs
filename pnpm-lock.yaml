@@ -56,6 +56,9 @@ importers:
       html-to-image:
         specifier: ^1.11.13
         version: 1.11.13
+      idb-keyval:
+        specifier: 6.2.2
+        version: 6.2.2
       lucide-react:
         specifier: ^1.59.0
         version: 1.59.0(@types/react@19.3.0)(react@19.3.1)
@@ -697,6 +700,9 @@ packages:
 
   html-to-image@1.11.13:
     resolution: {integrity: sha512-cuOPoI7WApyhBElTTb9oqsawRvZ0rHhaHwghRLlTuffoD1B2aDemlCruLeZrUIIdvG7gs9xeELEPm6PhuASqrg==}
+
+  idb-keyval@6.2.2:
+    resolution: {integrity: sha512-yjD9nARJ/jb1g+CvD0tlhUHOrJ9Sy0P8T9MF3YaLlHnSRpwPfpTX0XIvpmw3gAJUmEu3FiICLBDPXVwyEvrleg==}
 
   jiti@2.7.0:
     resolution: {integrity: sha512-AC/7JofJvZGrrneWNaEnJeOLUx+JlGt7tNa0wZiRPT4MY1wmfKjt2+6O2p2uz2+skll8OZZmJMNqeke7kKbNgQ==}
@@ -1608,6 +1614,8 @@ snapshots:
   graceful-fs@4.2.11: {}
 
   html-to-image@1.11.13: {}
+
+  idb-keyval@6.2.2: {}
 
   jiti@2.7.0: {}
 

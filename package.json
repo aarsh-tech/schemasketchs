@@ -35,6 +35,7 @@
     "@xyflow/react": "^12.12.0",
     "elkjs": "^0.12.0",
     "html-to-image": "^1.11.13",
+    "idb-keyval": "6.2.2",
     "lucide-react": "^1.59.0",
     "lz-string": "^1.5.0",
     "nanoid": "^6.0.2",

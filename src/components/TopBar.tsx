@@ -7,12 +7,14 @@ import {
   FileCode,
   FilePlus,
   FolderOpen,
+  History,
   Image,
   Monitor,
   Moon,
   Save,
   Share2,
   Sun,
+  Tag,
   Trash2,
   Upload,
 } from 'lucide-react'
@@ -152,6 +154,9 @@ export function TopBar() {
     { label: linked ? `Save to ${linked}` : 'Save to file…', icon: <Save size={14} />, hint: `${mod}S`, onSelect: () => void save() },
     { label: 'Save as…', icon: <Save size={14} />, hint: `${mod}⇧S`, onSelect: () => void save(true) },
     'separator',
+    { label: 'Save version…', icon: <Tag size={14} />, onSelect: () => useDialogs.getState().open({ type: 'history' }) },
+    { label: 'Version history…', icon: <History size={14} />, onSelect: () => useDialogs.getState().open({ type: 'history' }) },
+    'separator',
     { label: 'Import from SQL…', icon: <Upload size={14} />, onSelect: () => useDialogs.getState().open({ type: 'import-sql' }) },
   ]
 
@@ -211,6 +216,9 @@ export function TopBar() {
           <span className="hidden sm:inline">Share</span>
         </Button>
         <div className="mx-1 h-5 w-px bg-line" />
+        <IconButton label="Version history" onClick={() => useDialogs.getState().open({ type: 'history' })}>
+          <History size={16} />
+        </IconButton>
         <IconButton label="DBML help and shortcuts" onClick={() => useDialogs.getState().open({ type: 'help' })}>
           <CircleHelp size={16} />
         </IconButton>

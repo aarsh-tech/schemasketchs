@@ -19,6 +19,8 @@ import {
   toProjectFile,
 } from '@/lib/files'
 import type { ProjectFile } from '@/lib/files'
+import type { Version } from '@/lib/history'
+import { useHistory } from '@/store/history'
 import { useDialogs } from '@/store/dialogs'
 import { useProjects } from '@/store/projects'
 import { useUi } from '@/store/ui'
@@ -85,6 +87,43 @@ export async function editSchema(edit: SchemaEdit, opts: { quiet?: boolean; done
     return { ok: true }
   }
   return fail('The code kept changing while the edit was being made. Try again.')
+}
+
+/* ---------- version history ---------- */
+
+export async function saveVersion(label: string) {
+  const p = active()
+  if (!p) return
+  try {
+    await useHistory.getState().snapshot(p.id, { auto: false, label })
+    toast.success(label.trim() ? `Saved version “${label.trim()}”` : 'Saved a version')
+  } catch (err) {
+    toast.error('Could not save the version', { description: `${errorText(err)}. Your browser may be out of storage space.` })
+  }
+}
+
+/**
+ * Bring back a version's code and layout. The current state is snapshotted
+ * first, and the code change goes through the editor, so Ctrl+Z works too.
+ */
+export async function restoreVersion(version: Version) {
+  const p = active()
+  if (!p) return
+  try {
+    await useHistory.getState().snapshot(p.id, { auto: true })
+  } catch {
+    /* restoring matters more than the safety copy */
+  }
+  const before = editorText()
+  if (before === null || !replaceEditorText(before, version.source)) {
+    replaceActive({ source: version.source, positions: version.positions })
+  } else {
+    useProjects.getState().setPositions(version.positions, { replace: true })
+    useUi.getState().bumpCanvas()
+  }
+  toast.success(`Restored the version from ${new Date(version.createdAt).toLocaleString()}`, {
+    description: 'Your previous state was saved to the history first.',
+  })
 }
 
 /* ---------- open ---------- */

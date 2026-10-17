@@ -16,6 +16,7 @@ Planned features are listed in [ROADMAP.md](ROADMAP.md). Contributions are welco
 - **Focus**: hover a table or put your cursor inside its definition to highlight its relationships; double-click a table to jump to its code
 - **Column views**: all columns, keys only, or table names only
 - **Multiple schemas**: create, rename, duplicate and delete, all kept in this browser
+- **Version history**: a snapshot is taken after 30 seconds without edits, or save one by hand with a label. Browse versions with their time and table-count change, preview the code read-only, and restore both the code and the layout. Stored in IndexedDB: up to 100 automatic snapshots per schema, and labelled ones are never removed
 - **Files**: open/save `.dbml` or project `.json` (schema + layout). On Chrome and Edge, saving writes straight back to the file you opened
 - **Import SQL**: PostgreSQL, MySQL, SQL Server, Snowflake, Oracle and Rails `schema.rb`
 - **Export**: PNG, SVG, SQL (PostgreSQL, MySQL, SQL Server, Oracle), DBML, project JSON
