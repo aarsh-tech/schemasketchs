@@ -151,7 +151,7 @@ export function handleIncomingFile(name: string, text: string, handle?: FileSyst
     toast.success(`Opened ${file.name}`)
     return
   }
-  if (kind === 'sql' || kind === 'prisma' || kind === 'drizzle') {
+  if (kind === 'sql' || kind === 'prisma' || kind === 'drizzle' || kind === 'database') {
     useDialogs.getState().open({ type: 'import', format: kind, text, fileName: name })
     return
   }
@@ -175,13 +175,18 @@ export async function save(saveAs = false) {
 
 /* ---------- import SQL, Prisma, Drizzle ---------- */
 
-const FORMAT_LABEL: Record<ImportFormat, string> = { sql: 'SQL', prisma: 'Prisma', drizzle: 'Drizzle' }
+const FORMAT_LABEL: Record<ImportFormat, string> = { sql: 'SQL', prisma: 'Prisma', drizzle: 'Drizzle', database: 'database' }
 
 export async function importSchema(format: ImportFormat, text: string, opts: { dialect: ImportDialect; mode: 'new' | 'replace'; name?: string }) {
   let dbml: string
   let warnings: string[] = []
   if (format === 'sql') dbml = await importToDbml(text, opts.dialect)
-  else {
+  else if (format === 'database') {
+    const { importCatalog } = await import('@/lib/catalog')
+    const result = importCatalog(text)
+    dbml = result.dbml
+    warnings = result.warnings
+  } else {
     const { importOrm } = await import('@/lib/convert')
     const result = importOrm(format, text)
     dbml = result.dbml
@@ -190,7 +195,14 @@ export async function importSchema(format: ImportFormat, text: string, opts: { d
   if (opts.mode === 'replace') replaceActive({ source: dbml })
   else useProjects.getState().createProject({ name: opts.name ?? 'Imported schema', source: dbml })
   const what = FORMAT_LABEL[format]
-  const title = opts.mode === 'replace' ? `Replaced the schema with the imported ${what}` : `Imported ${what} into a new schema`
+  const title =
+    format === 'database'
+      ? opts.mode === 'replace'
+        ? 'Replaced the schema with the one read from the database'
+        : 'Read the database schema into a new schema'
+      : opts.mode === 'replace'
+        ? `Replaced the schema with the imported ${what}`
+        : `Imported ${what} into a new schema`
   if (warnings.length) {
     toast.warning(title, { description: `${warnings.length === 1 ? 'One thing' : `${warnings.length} things`} couldn't be converted. They're listed in a comment at the top of the code.` })
   } else toast.success(title)

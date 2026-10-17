@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import type { ProjectFile } from '@/lib/files'
 
-export type ImportFormat = 'sql' | 'prisma' | 'drizzle'
+export type ImportFormat = 'sql' | 'prisma' | 'drizzle' | 'database'
 
 export type DialogState =
   | { type: 'import'; format?: ImportFormat; text?: string; fileName?: string }

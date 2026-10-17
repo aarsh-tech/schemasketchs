@@ -210,7 +210,7 @@ export function clearShareHash() {
 
 /* ---------- misc ---------- */
 
-export type FileKind = 'dbml' | 'project' | 'sql' | 'prisma' | 'drizzle'
+export type FileKind = 'dbml' | 'project' | 'sql' | 'prisma' | 'drizzle' | 'database'
 
 const KIND_BY_EXTENSION: Record<string, FileKind> = {
   json: 'project',
@@ -228,12 +228,17 @@ const KIND_BY_EXTENSION: Record<string, FileKind> = {
 /** What a file holds, from its extension and, failing that, its text. */
 export function guessKind(name: string, text: string): FileKind {
   const ext = /\.([a-z]+)$/i.exec(name)?.[1]?.toLowerCase()
+  if (ext === 'json' && looksLikeCatalog(text)) return 'database'
   if (ext && KIND_BY_EXTENSION[ext]) return KIND_BY_EXTENSION[ext]
   return guessTextKind(text) ?? 'dbml'
 }
 
-/** Recognise pasted Prisma, Drizzle or SQL; null when it looks like none of them. */
+/** The JSON the database catalog queries return (see lib/catalog). */
+const looksLikeCatalog = (text: string) => /"dialect"\s*:\s*"(postgres|mysql|sqlite|mssql)"/.test(text) && /"columns"\s*:/.test(text)
+
+/** Recognise a pasted catalog result, Prisma, Drizzle or SQL; null when it looks like none of them. */
 export function guessTextKind(text: string): Exclude<FileKind, 'project' | 'dbml'> | null {
+  if (looksLikeCatalog(text)) return 'database'
   if (/^\s*(model|datasource|generator)\s+\w+\s*\{/m.test(text)) return 'prisma'
   if (/\b(pg|mysql|sqlite)Table(Creator)?\s*\(|from\s+['"]drizzle-orm/.test(text)) return 'drizzle'
   if (/^\s*create\s+(table|type|schema)|ActiveRecord::Schema/im.test(text)) return 'sql'

@@ -1,8 +1,9 @@
-import { ArrowRight, ArrowRightLeft, Copy, Download, GitCompareArrows, History, LoaderCircle, Minus, Pencil, Plus, RotateCcw, Tag, TriangleAlert } from 'lucide-react'
+import { ArrowRight, ArrowRightLeft, Copy, Download, GitCompareArrows, History, LoaderCircle, Minus, Pencil, Plus, RotateCcw, ShieldCheck, Tag, TriangleAlert } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import type { ClipboardEvent, FormEvent } from 'react'
 import { copyText, downloadCode, errorText, generateCode, importSchema, openProjectFile, restoreVersion, saveVersion } from '@/lib/actions'
 import type { CodeFormat } from '@/lib/actions'
+import type { CatalogDialect } from '@/lib/catalog'
 import type { OrmTarget } from '@/lib/convert'
 import { parseDbml } from '@/lib/dbml/client'
 import type { ImportDialect, ParseDiagnostic, SchemaModel } from '@/lib/dbml/types'
@@ -78,6 +79,12 @@ const IMPORT_FORMATS: { value: ImportFormat; label: string; description: string;
     description: 'Paste a Drizzle schema file (pg-core, mysql-core or sqlite-core). Tables, enums, references and indexes become DBML in your browser; nothing is uploaded.',
     placeholder: "export const users = pgTable('users', {\n  id: serial('id').primaryKey(),\n  email: varchar('email', { length: 255 }).notNull().unique(),\n})",
   },
+  {
+    value: 'database',
+    label: 'Database',
+    description: 'Read the schema of a live database without connecting to it: run a read-only query in your own client, then paste back the JSON it returns.',
+    placeholder: 'Paste the JSON the query returns, starting with {"dialect": …\n\nOr drop the saved .json result anywhere on the window.',
+  },
 ]
 
 function ImportDialog({ open, initial, onClose }: { open: boolean; initial: { format?: ImportFormat; text?: string; fileName?: string }; onClose: () => void }) {
@@ -92,7 +99,7 @@ function ImportDialog({ open, initial, onClose }: { open: boolean; initial: { fo
 
   const submit = async () => {
     if (!text.trim()) {
-      setError(`Paste a ${format === 'sql' ? 'SQL' : current.label} schema first.`)
+      setError(format === 'database' ? 'Run the query above in your database client, then paste the JSON it returns.' : `Paste a ${format === 'sql' ? 'SQL' : current.label} schema first.`)
       return
     }
     setBusy(true)
@@ -165,14 +172,18 @@ function ImportDialog({ open, initial, onClose }: { open: boolean; initial: { fo
           </select>
         </div>
       ) : null}
+      {format === 'database' ? <CatalogQuery /> : null}
       <textarea
         value={text}
         onChange={(e) => setText(e.target.value)}
         onPaste={onPaste}
         spellCheck={false}
-        aria-label={`${current.label} to import`}
+        aria-label={format === 'database' ? 'Query result to import' : `${current.label} to import`}
         placeholder={current.placeholder}
-        className="mt-3 h-72 w-full resize-y rounded-lg border border-line-strong bg-panel p-3 font-mono text-[12.5px] leading-relaxed outline-none focus:border-accent"
+        className={cx(
+          'mt-3 w-full resize-y rounded-lg border border-line-strong bg-panel p-3 font-mono text-[12.5px] leading-relaxed outline-none focus:border-accent',
+          format === 'database' ? 'h-36' : 'h-72',
+        )}
         onKeyDown={(e) => {
           if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') void submit()
         }}
@@ -183,6 +194,61 @@ function ImportDialog({ open, initial, onClose }: { open: boolean; initial: { fo
         </p>
       ) : null}
     </Dialog>
+  )
+}
+
+/** The read-only catalog query for each database, to copy and run elsewhere. */
+function CatalogQuery() {
+  const [dialect, setDialect] = useState<CatalogDialect>(() => (/mysql|maria/i.test(useUi.getState().model.databaseType ?? '') ? 'mysql' : 'postgres'))
+  // the queries live in the lazily loaded catalog module
+  const [catalog, setCatalog] = useState<typeof import('@/lib/catalog') | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    void import('@/lib/catalog').then((m) => !cancelled && setCatalog(m))
+    return () => {
+      cancelled = true
+    }
+  }, [])
+  const query = catalog?.CATALOG_QUERIES[dialect] ?? ''
+
+  return (
+    <div className="mt-3 grid gap-2">
+      <p className="flex items-start gap-2 rounded-md border border-line bg-accent-soft px-3 py-2 text-[12.5px] text-ink">
+        <ShieldCheck size={15} className="mt-px shrink-0 text-accent" aria-hidden />
+        <span>
+          Schemasketch never connects to your database. You run the query yourself; it only reads the schema, never your data. The JSON you paste back is read in this
+          browser and nothing is uploaded.
+        </span>
+      </p>
+      <div className="flex flex-wrap items-center gap-2">
+        <Segmented
+          label="Database"
+          value={dialect}
+          onChange={setDialect}
+          options={[
+            { value: 'postgres', label: 'PostgreSQL' },
+            { value: 'mysql', label: 'MySQL' },
+            { value: 'sqlite', label: 'SQLite' },
+            { value: 'mssql', label: 'SQL Server' },
+          ]}
+        />
+        <div className="flex-1" />
+        <Button size="sm" variant="outline" disabled={!query} onClick={() => copyText(query, 'Query copied')}>
+          <Copy size={13} /> Copy query
+        </Button>
+        <Button size="sm" variant="outline" disabled={!query} onClick={() => downloadText(query, `schemasketch-catalog.${dialect}.sql`, 'application/sql')}>
+          <Download size={13} /> .sql
+        </Button>
+      </div>
+      <pre
+        tabIndex={0}
+        aria-label={`Catalog query for ${dialect}`}
+        className="h-32 overflow-auto rounded-lg border border-line bg-panel p-3 font-mono text-[11.5px] leading-relaxed text-ink-2 scrollbar-thin"
+      >
+        {query || 'Loading…'}
+      </pre>
+      {catalog ? <p className="text-[12px] text-ink-2">{catalog.CATALOG_HOWTO[dialect]}</p> : null}
+    </div>
   )
 }
 

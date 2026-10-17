@@ -25,7 +25,7 @@ export default function App() {
       <Dialogs />
       {dragging ? (
         <div className="pointer-events-none fixed inset-3 z-[70] flex items-center justify-center rounded-2xl border-2 border-dashed border-accent bg-accent-soft/80 backdrop-blur-sm">
-          <p className="text-[15px] font-semibold text-accent">Drop a .dbml, .sql, .prisma, Drizzle .ts or project .json file to open it</p>
+          <p className="text-[15px] font-semibold text-accent">Drop a .dbml, .sql, .prisma, Drizzle .ts, project .json or database catalog .json file to open it</p>
         </div>
       ) : null}
       <Toaster

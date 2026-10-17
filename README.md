@@ -21,9 +21,10 @@ Planned features are listed in [ROADMAP.md](ROADMAP.md). Contributions are welco
 - **Files**: open/save `.dbml` or project `.json` (schema + layout). On Chrome and Edge, saving writes straight back to the file you opened
 - **Import SQL**: PostgreSQL, MySQL, SQL Server, Snowflake, Oracle and Rails `schema.rb`
 - **ORM import and export**: import a Prisma `schema.prisma` or a Drizzle schema file (pg-core, mysql-core or sqlite-core) into DBML, with models, enums, relations, indexes and mapped names. Export the schema as a Prisma schema (PostgreSQL, MySQL or SQLite), a Drizzle schema (pg-core or mysql-core), TypeScript row interfaces or Zod 4 schemas. Anything a format can't hold is called out in a comment rather than silently dropped
+- **Import from a live database, with no connection**: pick PostgreSQL, MySQL, SQLite or SQL Server and copy a ready-made read-only catalog query. Run it in your own client and paste back the JSON it returns (or drop the saved `.json` file): tables, columns, types, defaults, primary and foreign keys, indexes, enums and comments become DBML. Schemasketch never connects to the database
 - **Export**: PNG, SVG, SQL (PostgreSQL, MySQL, SQL Server, Oracle), Prisma, Drizzle, TypeScript, Zod, DBML, project JSON
 - **Share links**: the whole schema is compressed into the URL hash, so no server is involved
-- **Drag and drop** a file anywhere on the window to open it: `.dbml`, `.sql`, `schema.rb`, `.prisma`, a Drizzle `.ts` file or a project `.json`. The format is detected and the right import tab opens
+- **Drag and drop** a file anywhere on the window to open it: `.dbml`, `.sql`, `schema.rb`, `.prisma`, a Drizzle `.ts` file, a project `.json` or a database catalog result `.json`. The format is detected and the right import tab opens
 - Light and dark themes, works on phones
 
 ## Run it locally
@@ -91,6 +92,7 @@ src/
     dialogs/          import, export, share, help
   lib/diff/           schema diff → change summary and up/down migration SQL (pure functions, lazy-loaded)
   lib/convert/        Prisma and Drizzle ⇄ schema model, TypeScript and Zod output, model → DBML (pure, lazy-loaded)
+  lib/catalog/        read-only catalog queries per database, and their JSON result → schema model (pure, lazy-loaded)
   lib/files.ts        File System Access API with download fallbacks, share-link encoding
 ```
 

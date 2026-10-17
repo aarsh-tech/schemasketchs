@@ -84,6 +84,9 @@ importers:
         specifier: ^5.0.15
         version: 5.0.15(@types/react@19.3.0)(react@19.3.1)(use-sync-external-store@1.7.0(react@19.3.1))
     devDependencies:
+      '@electric-sql/pglite':
+        specifier: 0.5.8
+        version: 0.5.8
       '@prisma/prisma-schema-wasm':
         specifier: 8.1.0-1.d1b3f377ca835d73fd50954a5e22128b9ebdd6b8
         version: 8.1.0-1.d1b3f377ca835d73fd50954a5e22128b9ebdd6b8
@@ -104,7 +107,7 @@ importers:
         version: 6.1.2(vite@8.3.4(@types/node@24.19.2)(jiti@2.7.0))
       drizzle-orm:
         specifier: 0.45.3
-        version: 0.45.3
+        version: 0.45.3(@electric-sql/pglite@0.5.8)
       oxlint:
         specifier: ^1.81.0
         version: 1.88.0
@@ -166,6 +169,9 @@ packages:
   '@dbml/parse@10.3.1':
     resolution: {integrity: sha512-l2T+RYUpkCxqSlqMnc3YOwJyLDnDDckddG26KO4vwtYGJKIPYautzBi+ypKxEMdLvuNpHN/HkRCteApeZei8TA==}
     engines: {node: '>=18'}
+
+  '@electric-sql/pglite@0.5.8':
+    resolution: {integrity: sha512-n9tsbUOhwx2epK1V0ZG9Ar4SHWUju04dhmzZXiSBXwBoleOvIfals33NAaWgagQVAL4Rbvx/Ptsu3P+pA09f6Q==}
 
   '@fontsource-variable/jetbrains-mono@5.3.0':
     resolution: {integrity: sha512-F32xpS2NsGYoQi2ADSkKTgpJj7ozajsGgDJ8woTnqjmIB+dxDIqImjl4pXZVEExu8UFZ2ndhmX18EBS/hdz3Lw==}
@@ -1320,6 +1326,8 @@ snapshots:
       luxon: 3.7.2
       pathe: 2.0.3
 
+  '@electric-sql/pglite@0.5.8': {}
+
   '@fontsource-variable/jetbrains-mono@5.3.0': {}
 
   '@fontsource-variable/schibsted-grotesk@5.3.0': {}
@@ -1701,7 +1709,9 @@ snapshots:
 
   detect-libc@2.1.2: {}
 
-  drizzle-orm@0.45.3: {}
+  drizzle-orm@0.45.3(@electric-sql/pglite@0.5.8):
+    optionalDependencies:
+      '@electric-sql/pglite': 0.5.8
 
   elkjs@0.12.0: {}
 

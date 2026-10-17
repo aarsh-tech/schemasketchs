@@ -43,7 +43,7 @@ Today the diagram only reflects the code. Make edits on the canvas write back in
 - Add these to the Import and Export dialogs as tabs, with format detection when a file is dropped.
 - Converters live in `src/lib/convert/`, are lazy-loaded, and have round-trip tests.
 
-### - [ ] 5. Import from a live database (no backend)
+### - [x] 5. Import from a live database (no backend)
 
 - Dialog: choose PostgreSQL, MySQL, SQLite or SQL Server, and get a ready-made catalog query to copy (reads tables, columns, PKs, FKs, indexes and enums as one JSON result).
 - The user runs it in their own client and pastes the JSON back. Schemasketch builds the DBML from it.
