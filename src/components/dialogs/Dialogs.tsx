@@ -1,4 +1,4 @@
-import { ArrowRight, ArrowRightLeft, Copy, Download, GitCompareArrows, History, LoaderCircle, Minus, Pencil, Plus, RotateCcw, ShieldCheck, Tag, TriangleAlert } from 'lucide-react'
+import { ArrowRight, ArrowRightLeft, Copy, Download, GitCompareArrows, History, LoaderCircle, Minus, Pencil, Plus, Radio, RotateCcw, ShieldCheck, Tag, TriangleAlert } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import type { ClipboardEvent, FormEvent } from 'react'
 import { copyText, downloadCode, errorText, generateCode, importSchema, openProjectFile, restoreVersion, saveVersion } from '@/lib/actions'
@@ -11,6 +11,8 @@ import type { ChangeKind, MigrationDialect, SummaryItem } from '@/lib/diff'
 import { baseName, clearShareHash, downloadText, guessTextKind, slug } from '@/lib/files'
 import { IDLE_MS, deleteVersions, describeDelta, tableDelta } from '@/lib/history'
 import { neighbours } from '@/lib/views'
+import { liveHash } from '@/lib/collab/link'
+import { useCollab } from '@/store/collab'
 import type { Version } from '@/lib/history'
 import { useHistory } from '@/store/history'
 import { useDialogs } from '@/store/dialogs'
@@ -46,6 +48,8 @@ export function Dialogs() {
       <MigrationDialog dialog={dialog?.type === 'migration' ? dialog : null} onClose={close} />
       <ViewDialog dialog={dialog?.type === 'view' ? dialog : null} onClose={close} />
       <CommandPalette dialog={dialog?.type === 'palette' ? dialog : null} onClose={close} />
+      <LiveDialog open={dialog?.type === 'live'} onClose={close} />
+      <LiveJoinDialog dialog={dialog?.type === 'live-join' ? dialog : null} onClose={close} />
     </>
   )
 }
@@ -703,6 +707,177 @@ function HistoryBody({ onClose }: { onClose: () => void }) {
         </div>
       )}
     </div>
+  )
+}
+
+/* ---------- live sessions ---------- */
+
+const PRIVACY = 'Edits travel straight between browsers over WebRTC, encrypted with a key that only exists in the link. Public signalling servers only help browsers find each other; they see the encrypted connection setup, never your schema.'
+
+function LiveDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const status = useCollab((s) => s.status)
+  return (
+    <Dialog open={open} onClose={onClose} width={560} title={status === 'off' ? 'Start a live session' : 'Live session'} description={PRIVACY}>
+      {open ? <LiveBody onClose={onClose} /> : null}
+    </Dialog>
+  )
+}
+
+function LiveBody({ onClose }: { onClose: () => void }) {
+  const c = useCollab()
+  const activeId = useProjects((s) => s.activeId)
+  const sharedName = useProjects((s) => (c.projectId ? s.projects[c.projectId]?.name : null))
+  const [name, setName] = useState(c.name)
+  const [signaling, setSignaling] = useState(c.signaling)
+  const [busy, setBusy] = useState(false)
+  const link = c.room && c.key ? `${location.origin}${location.pathname}#${liveHash(c.room, c.key, c.servers)}` : ''
+
+  const nameField = (
+    <div className="grid gap-1">
+      <label htmlFor="live-name" className="text-[12px] font-medium text-ink-2">
+        Your name, shown to the others
+      </label>
+      <input
+        id="live-name"
+        value={name}
+        maxLength={40}
+        onChange={(e) => setName(e.target.value)}
+        onBlur={() => c.setName(name)}
+        className="h-8 rounded-md border border-line-strong bg-panel px-2.5 text-[13px] outline-none focus:border-accent"
+      />
+    </div>
+  )
+
+  if (c.status === 'off') {
+    return (
+      <div className="grid gap-3">
+        {nameField}
+        <details className="rounded-lg border border-line px-3 py-2 text-[12.5px]">
+          <summary className="cursor-pointer font-medium text-ink-2">Signalling servers</summary>
+          <p className="mt-2 text-ink-2">
+            One per line. Everyone in a session must use the same one. Tabs in this browser always find each other; people on other devices need a server both can reach. Run your own with <code className="font-mono">pnpm signaling</code> (or <code className="font-mono">npx y-webrtc</code>), then enter its ws:// address here.
+          </p>
+          <textarea
+            value={signaling}
+            onChange={(e) => setSignaling(e.target.value)}
+            onBlur={() => c.setSignaling(signaling)}
+            aria-label="Signalling server addresses"
+            spellCheck={false}
+            className="mt-2 h-16 w-full resize-y rounded-md border border-line-strong bg-panel p-2 font-mono text-[12px] outline-none focus:border-accent"
+          />
+        </details>
+        <div className="flex justify-end gap-2">
+          <Button onClick={onClose}>Cancel</Button>
+          <Button
+            variant="primary"
+            disabled={busy}
+            onClick={async () => {
+              setBusy(true)
+              c.setName(name)
+              c.setSignaling(signaling)
+              await useCollab.getState().start()
+              setBusy(false)
+            }}
+          >
+            {busy ? <LoaderCircle size={14} className="animate-spin" /> : <Radio size={14} />} Start live session
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="grid gap-3">
+      {c.projectId !== activeId ? (
+        <p className="rounded-md bg-hover px-3 py-2 text-[12.5px] text-ink-2">
+          The session shares <span className="font-medium text-ink">{sharedName}</span>.{' '}
+          <button type="button" className="text-accent underline underline-offset-2" onClick={() => c.projectId && useProjects.getState().setActive(c.projectId)}>
+            Switch to it
+          </button>
+        </p>
+      ) : null}
+      <div className="grid gap-1">
+        <span className="text-[12px] font-medium text-ink-2">Invite link</span>
+        <div className="flex gap-2">
+          <input readOnly value={link} onFocus={(e) => e.currentTarget.select()} aria-label="Invite link" className="h-8 min-w-0 flex-1 rounded-md border border-line-strong bg-panel px-2.5 font-mono text-[12px] text-ink-2 outline-none" />
+          <Button variant="primary" onClick={() => copyText(link, 'Invite link copied')}>
+            <Copy size={14} /> Copy
+          </Button>
+        </div>
+      </div>
+      <p className={cx('flex items-start gap-2 rounded-md px-3 py-2 text-[12.5px]', c.signalingOk === false ? 'bg-warn-soft text-ink' : 'bg-accent-soft text-ink')}>
+        <span className={cx('mt-1 h-2 w-2 shrink-0 rounded-full', c.signalingOk === false ? 'bg-warn' : c.signalingOk ? 'bg-accent' : 'animate-pulse bg-ink-3')} aria-hidden />
+        {c.signalingOk === false
+          ? 'Can’t reach a signalling server, so only tabs in this browser can join. Add a server you can reach when starting the next session.'
+          : c.signalingOk
+            ? 'Connected. Anyone with the link can join while you’re here.'
+            : 'Connecting…'}
+      </p>
+      <div className="grid gap-1">
+        <span className="text-[12px] font-medium text-ink-2">In this session</span>
+        <ul className="grid gap-1">
+          <li className="flex items-center gap-2 text-[13px]">
+            <span className="h-3 w-3 rounded-full" style={{ background: c.color }} aria-hidden /> {c.name} <span className="text-ink-3">(you)</span>
+          </li>
+          {c.peers.map((p) => (
+            <li key={p.id} className="flex items-center gap-2 text-[13px]">
+              <span className="h-3 w-3 rounded-full" style={{ background: p.color }} aria-hidden /> {p.name}
+              {p.table ? <span className="font-mono text-[11.5px] text-ink-3">on {p.table}</span> : null}
+            </li>
+          ))}
+          {c.peers.length === 0 ? <li className="text-[12.5px] text-ink-3">Nobody else yet. Send them the link.</li> : null}
+        </ul>
+      </div>
+      {nameField}
+      <div className="flex justify-end gap-2 border-t border-line pt-3">
+        <Button
+          variant="outline"
+          className="text-danger"
+          onClick={() => {
+            c.leave()
+            onClose()
+          }}
+        >
+          Leave session
+        </Button>
+        <Button variant="primary" onClick={onClose}>
+          Done
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+function LiveJoinDialog({ dialog, onClose }: { dialog: { room: string; key: string; signaling: string[] } | null; onClose: () => void }) {
+  const notNow = () => {
+    history.replaceState(null, '', location.pathname + location.search)
+    onClose()
+  }
+  return (
+    <Dialog
+      open={!!dialog}
+      onClose={notNow}
+      width={480}
+      title="Join a live session?"
+      description="Someone invited you to edit a schema together. It opens as a schema in this browser, and your edits are shared while you're in the session. When you leave, you keep a copy."
+      footer={
+        <>
+          <Button onClick={notNow}>Not now</Button>
+          <Button
+            variant="primary"
+            autoFocus
+            onClick={() => {
+              if (dialog) void useCollab.getState().join(dialog.room, dialog.key, dialog.signaling)
+              onClose()
+            }}
+          >
+            <Radio size={14} /> Join session
+          </Button>
+        </>
+      }
+    >
+      <p className="text-[12.5px] text-ink-2">{PRIVACY}</p>
+    </Dialog>
   )
 }
 

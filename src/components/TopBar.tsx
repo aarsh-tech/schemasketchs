@@ -13,6 +13,7 @@ import {
   Image,
   Monitor,
   Moon,
+  Radio,
   Save,
   Search,
   Share2,
@@ -23,7 +24,9 @@ import {
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { downloadCode, downloadImage, downloadPdf, newProject, openFromDisk, save, share } from '@/lib/actions'
+import { initials } from '@/lib/collab/link'
 import { getLinkedFile } from '@/lib/files'
+import { useCollab } from '@/store/collab'
 import { useDialogs } from '@/store/dialogs'
 import { useProjects } from '@/store/projects'
 import { useUi } from '@/store/ui'
@@ -130,6 +133,41 @@ function ProjectSwitcher() {
   )
 }
 
+function LiveButton() {
+  const status = useCollab((s) => s.status)
+  const peers = useCollab((s) => s.peers)
+  const activeId = useProjects((s) => s.activeId)
+  const sharedHere = useCollab((s) => s.projectId === activeId)
+  const open = () => useDialogs.getState().open({ type: 'live' })
+  if (status === 'off') {
+    return (
+      <IconButton label="Start a live session" onClick={open} className="max-sm:hidden">
+        <Radio size={16} />
+      </IconButton>
+    )
+  }
+  return (
+    <button
+      type="button"
+      onClick={open}
+      title={sharedHere ? 'Live session: people and link' : 'A live session is running on another schema'}
+      className="ml-1 inline-flex h-8 items-center gap-1.5 rounded-md border border-accent/50 bg-accent-soft px-2 text-[12.5px] font-medium text-accent"
+    >
+      <span className={cx('h-2 w-2 rounded-full', status === 'live' ? 'bg-accent' : 'animate-pulse bg-ink-3')} aria-hidden />
+      <span className="max-sm:hidden">Live</span>
+      {peers.length ? (
+        <span className="flex -space-x-1.5" aria-label={`${peers.length} others`}>
+          {peers.slice(0, 3).map((p) => (
+            <span key={p.id} className="flex h-5 w-5 items-center justify-center rounded-full border border-raised text-[9.5px] font-bold text-white" style={{ background: p.color }}>
+              {initials(p.name)}
+            </span>
+          ))}
+        </span>
+      ) : null}
+    </button>
+  )
+}
+
 function ThemeToggle() {
   const theme = useUi((s) => s.theme)
   const setTheme = useUi((s) => s.setTheme)
@@ -160,6 +198,7 @@ export function TopBar() {
     { label: 'Save version…', icon: <Tag size={14} />, onSelect: () => useDialogs.getState().open({ type: 'history' }) },
     { label: 'Version history…', icon: <History size={14} />, onSelect: () => useDialogs.getState().open({ type: 'history' }) },
     { label: 'Generate migration…', icon: <GitCompareArrows size={14} />, onSelect: () => useDialogs.getState().open({ type: 'migration' }) },
+    { label: 'Live session…', icon: <Radio size={14} />, onSelect: () => useDialogs.getState().open({ type: 'live' }) },
     'separator',
     { label: 'Import SQL, Prisma or Drizzle…', icon: <Upload size={14} />, onSelect: () => useDialogs.getState().open({ type: 'import' }) },
   ]
@@ -218,6 +257,7 @@ export function TopBar() {
             </Button>
           )}
         />
+        <LiveButton />
         <Button variant="outline" onClick={share} className="ml-1">
           <Share2 size={14} />
           <span className="hidden sm:inline">Share</span>

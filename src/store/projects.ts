@@ -22,6 +22,8 @@ export interface Project {
   views?: SchemaView[]
   /** view shown on the canvas; null or missing shows every table */
   activeView?: string | null
+  /** room of the live session this schema is shared in, while it is */
+  liveRoom?: string
   createdAt: number
   updatedAt: number
 }
@@ -46,6 +48,10 @@ interface ProjectsState {
   updateView: (viewId: string, patch: Partial<Pick<SchemaView, 'name' | 'tableIds'>>) => void
   deleteView: (viewId: string) => void
   setActiveView: (viewId: string | null) => void
+  /** Change a project that may not be the one on screen (live sessions). Leaves its parse state alone. */
+  patchProject: (id: string, patch: Partial<Pick<Project, 'source' | 'liveRoom'>>) => void
+  /** Merge full-diagram positions into a project that may not be the one on screen. */
+  mergePositions: (id: string, positions: Record<string, XY>) => void
 }
 
 /** The view a project shows, if it's showing one. */
@@ -192,6 +198,24 @@ export const useProjects = create<ProjectsState>()(
         })
       },
 
+      patchProject(id, patch) {
+        set((s) => {
+          const p = s.projects[id]
+          if (!p) return s
+          const next = { ...p, ...patch, updatedAt: now() }
+          if ('liveRoom' in patch && !patch.liveRoom) delete next.liveRoom
+          return { projects: { ...s.projects, [id]: next } }
+        })
+      },
+
+      mergePositions(id, positions) {
+        set((s) => {
+          const p = s.projects[id]
+          if (!p) return s
+          return { projects: { ...s.projects, [id]: { ...p, positions: { ...p.positions, ...positions } } } }
+        })
+      },
+
       setActiveView(viewId) {
         set((s) => {
           const p = s.projects[s.activeId]
@@ -229,8 +253,8 @@ export const useProjects = create<ProjectsState>()(
     }),
     {
       name: 'schemasketch:projects',
-      // v2 added the optional lintOff list, v3 the optional views; older projects load unchanged
-      version: 3,
+      // v2 added the optional lintOff list, v3 the optional views, v4 the optional liveRoom; older projects load unchanged
+      version: 4,
       migrate: (persisted) => persisted as ProjectsState,
       storage: createDebouncedStorage(),
       partialize: (s) => ({ projects: s.projects, activeId: s.activeId }) as ProjectsState,

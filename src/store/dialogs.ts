@@ -18,6 +18,9 @@ export type DialogState =
   | { type: 'view'; viewId?: string; tableIds?: string[] }
   /** the command palette; mode 'focus' asks which table to focus on */
   | { type: 'palette'; mode?: 'focus' }
+  | { type: 'live' }
+  /** someone opened a live session link */
+  | { type: 'live-join'; room: string; key: string; signaling: string[] }
   | null
 
 export const useDialogs = create<{ dialog: DialogState; open: (d: DialogState) => void; close: () => void }>((set) => ({

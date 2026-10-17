@@ -6,6 +6,7 @@ import type { FieldModel } from '@/lib/dbml/types'
 import { useProblems } from '@/hooks/useProblems'
 import { readableText } from '@/lib/color'
 import { useCanvas } from '@/store/canvas'
+import { useCollab } from '@/store/collab'
 import { useUi } from '@/store/ui'
 import { cancelPendingClick, connectHandleId, dropHandleId, openColumn, openColumnSoon } from './editing'
 import type { GroupNode, NoteNode, TableNode } from './graph'
@@ -90,16 +91,24 @@ function FieldRow({ tableId, field }: { tableId: string; field: FieldModel }) {
   )
 }
 
+/** Collaborators looking at this table, as "name|color" pairs so the selector stays a cheap string. */
+function usePeersOn(tableId: string): { name: string; color: string }[] {
+  const key = useCollab((s) => s.peers.filter((p) => p.table === tableId).map((p) => `${p.name}|${p.color}`).join('\n'))
+  return key ? key.split('\n').map((k) => ({ name: k.split('|')[0], color: k.split('|')[1] })) : []
+}
+
 export const TableNodeView = memo(function TableNodeView({ data, selected }: NodeProps<TableNode>) {
   const { table, fields, hiddenCount, color, highlight } = data
   const ring = selected || highlight === 'focus'
+  const peers = usePeersOn(table.id)
+  const peerRing = peers.length ? peers.map((p, i) => `0 0 0 ${2 + i * 2}px ${p.color}`).join(', ') : null
   return (
     <div
-      className="overflow-hidden rounded-lg border bg-table shadow-table"
+      className="relative rounded-lg border bg-table shadow-table [&>:last-child]:overflow-hidden [&>:last-child]:rounded-b-[7px]"
       style={{
         width: TABLE_WIDTH,
         borderColor: ring ? color : 'var(--c-line-strong)',
-        boxShadow: ring ? `0 0 0 1.5px ${color}, var(--shadow-table)` : undefined,
+        boxShadow: peerRing ? `${peerRing}, var(--shadow-table)` : ring ? `0 0 0 1.5px ${color}, var(--shadow-table)` : undefined,
       }}
       onMouseEnter={() => useUi.getState().setHoveredTable(table.id)}
       onMouseLeave={() => useUi.getState().setHoveredTable(null)}
@@ -109,7 +118,16 @@ export const TableNodeView = memo(function TableNodeView({ data, selected }: Nod
         useUi.getState().revealTable(table.id)
       }}
     >
-      <div className="relative flex items-center gap-2 pr-1 pl-3" style={{ height: HEADER_H, background: color, color: readableText(color) }}>
+      {peers.length ? (
+        <div className="ss-export-hide pointer-events-none absolute -top-6 left-0 flex gap-1" aria-label={`Selected by ${peers.map((p) => p.name).join(', ')}`}>
+          {peers.map((p) => (
+            <span key={p.name} className="rounded-md px-1.5 py-0.5 text-[11px] leading-none font-semibold whitespace-nowrap text-white" style={{ background: p.color }}>
+              {p.name}
+            </span>
+          ))}
+        </div>
+      ) : null}
+      <div className="relative flex items-center gap-2 overflow-hidden rounded-t-[7px] pr-1 pl-3" style={{ height: HEADER_H, background: color, color: readableText(color) }}>
         <RowHandles field={null} />
         <span className="min-w-0 flex-1 truncate text-[13.5px] font-semibold tracking-[-0.01em]">
           {table.schema ? <span className="font-normal opacity-75">{table.schema}.</span> : null}

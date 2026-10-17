@@ -11,6 +11,7 @@ import { useUi } from '@/store/ui'
 import { attachEditor, flashEffect, flashField } from './bridge'
 import { dbmlHighlight, dbmlLanguage } from './dbmlLanguage'
 import { useProblems } from '@/hooks/useProblems'
+import { alignSharedEditor, useCollab } from '@/store/collab'
 import { dbmlCompletions, findColumnRange, problemsToCm, tableAtPosition, toCmDiagnostics } from './dbmlTools'
 
 const baseTheme = EditorView.theme({
@@ -28,9 +29,12 @@ export function SchemaEditor() {
   const initial = useMemo(() => useProjects.getState().projects[activeId]?.source ?? '', [activeId, epoch])
   const ref = useRef<ReactCodeMirrorRef>(null)
   const cursorTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  // in a live session the shared project's editor is bound to the shared text
+  const shared = useCollab((s) => (s.projectId === activeId ? s.editorExtension : null))
 
   const extensions = useMemo(
     () => [
+      ...(shared ? [shared] : []),
       dbmlLanguage,
       dbmlHighlight,
       indentUnit.of('  '),
@@ -52,7 +56,7 @@ export function SchemaEditor() {
         },
       }),
     ],
-    [],
+    [shared],
   )
 
   // push parser errors, or lint warnings when the code parses, into the editor
@@ -91,7 +95,10 @@ export function SchemaEditor() {
       ref={ref}
       value={initial}
       onChange={(value) => useProjects.getState().setSource(value)}
-      onCreateEditor={attachEditor}
+      onCreateEditor={(view) => {
+        attachEditor(view)
+        if (shared) alignSharedEditor(view)
+      }}
       extensions={extensions}
       theme="none"
       height="100%"

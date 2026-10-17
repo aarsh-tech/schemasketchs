@@ -38,6 +38,8 @@ src/
   lib/convert/             Prisma/Drizzle ⇄ SchemaModel, TypeScript/Zod export, SchemaModel → DBML (pure; lazy-loaded)
   lib/catalog/             catalog queries per database + their JSON result → SchemaModel (pure; lazy-loaded)
   lib/lint/                schema lint rules, one per file in rules/ (pure; run via hooks/useProblems)
+  lib/collab/              live sessions: session.ts (Yjs, y-webrtc, y-codemirror.next; lazy) and link.ts (pure)
+  store/collab.ts          live session state; the only place that starts or stops a session
   lib/actions.ts           user-level actions (open, save, import, export, share)
   lib/files.ts             File System Access API + fallbacks, share-link encoding
   components/editor/       CodeMirror: DBML stream language, lint, autocomplete
@@ -53,6 +55,7 @@ src/
 - **Parsing only happens in the worker.** Never import `@dbml/core`'s main entry on the main thread: it pulls in about 15 MB of SQL grammars. The parse worker imports internals through the Vite aliases `@dbml-core-database` and `@dbml-core-exporter` (see `vite.config.ts` and `lib/dbml/vendor.d.ts`). Only `sql.worker.ts` may import `@dbml/core` itself.
 - **Heavy libraries are lazy-loaded** with dynamic `import()` (elkjs already is). Keep the main bundle small.
 - **Offline (PWA)**: `vite-plugin-pwa` precaches the build except `sql.worker-*.js`, which is runtime-cached on first use (see `vite.config.ts`). The service worker only registers in production builds (`hooks/useServiceWorker.ts`); test it with `pnpm build && pnpm preview`.
+- **Live sessions share one project**: the editor of `useCollab().projectId` gets the Yjs binding, and position changes on that project are mirrored to the shared doc. Only the host seeds the doc; joiners start empty, or the text doubles.
 - **Never call setState inside an effect.** oxlint flags it. Derive values during render, or remount with a `key`.
 - **Persisted data shapes** (`schemasketch:projects`, `schemasketch:ui`, project `.json` files, share links): when you change one, keep old data loading. Bump the persist `version` and add a `migrate`.
 

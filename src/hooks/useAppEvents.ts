@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { handleIncomingFile, openFromDisk, save } from '@/lib/actions'
 import { readShareFromHash } from '@/lib/files'
+import { readLiveHash } from '@/lib/collab/link'
+import { useCollab } from '@/store/collab'
 import { useDialogs } from '@/store/dialogs'
 
 /** Global keyboard shortcuts. */
@@ -27,10 +29,16 @@ export function useShortcuts() {
   }, [])
 }
 
-/** Open a schema shared via the URL hash. */
+/** Open a schema shared via the URL hash, or offer to join a live session. */
 export function useIncomingShare() {
   useEffect(() => {
     const check = () => {
+      const live = readLiveHash(window.location.hash)
+      if (live) {
+        const collab = useCollab.getState()
+        if (collab.room !== live.room) useDialogs.getState().open({ type: 'live-join', ...live })
+        return
+      }
       const file = readShareFromHash(window.location.hash)
       if (file) useDialogs.getState().open({ type: 'shared-link', file })
     }

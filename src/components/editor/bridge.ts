@@ -71,8 +71,16 @@ export function replaceEditorText(expected: string, next: string): boolean {
   return true
 }
 
+let undoOverride: (() => boolean) | null = null
+
+/** In a live session, undo goes through the shared document so it only undoes your own changes. */
+export function setUndoOverride(fn: (() => boolean) | null) {
+  undoOverride = fn
+}
+
 /** Undo the last change in the editor (used by "Undo" in toasts). */
 export function undoInEditor(): boolean {
+  if (undoOverride) return undoOverride()
   const view = live()
   return view ? undo(view) : false
 }

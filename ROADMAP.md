@@ -84,7 +84,7 @@ Today the diagram only reflects the code. Make edits on the canvas write back in
 
 ## Phase 3: ambitious extras
 
-### - [ ] 11. Live collaboration without a server
+### - [x] 11. Live collaboration without a server
 
 - Yjs document for the DBML text and positions, synced peer-to-peer with `y-webrtc` and the editor bound with `y-codemirror.next`.
 - "Start live session" creates a room link. Show collaborators' cursors and selected tables. Leaving the session keeps a local copy.

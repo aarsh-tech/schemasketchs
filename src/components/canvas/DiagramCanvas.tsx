@@ -21,6 +21,7 @@ import type { SchemaModel } from '@/lib/dbml/types'
 import { makeStep } from '@/lib/layoutHistory'
 import { tablesWithin } from '@/lib/search'
 import { useLayoutHistory } from '@/store/layoutHistory'
+import { onRemoteMoves, shareSelectedTable } from '@/store/collab'
 import { viewModel } from '@/lib/views'
 import { useUi } from '@/store/ui'
 import { CanvasOverlays } from './CanvasOverlays'
@@ -286,6 +287,19 @@ export function DiagramCanvas() {
     const raf = requestAnimationFrame(() => rf.fitView({ nodes: ids, padding: 0.18, duration: 300, maxZoom: 1.1 }))
     return () => cancelAnimationFrame(raf)
   }, [focusKey, rf])
+
+  /* ---- live session: others' moves, and the table we're on ---- */
+  useEffect(
+    () =>
+      onRemoteMoves((projectId, positions) => {
+        if (projectId !== activeId || view) return
+        setNodes((prev) => refreshGroups(modelRef.current, prev.map((n) => (positions[n.id] ? { ...n, position: positions[n.id] } : n))))
+      }),
+    [activeId, view],
+  )
+  useEffect(() => {
+    shareSelectedTable(selectedId ?? cursorTable)
+  }, [selectedId, cursorTable])
 
   /* ---- centre on a table (command palette) ---- */
   useEffect(() => {

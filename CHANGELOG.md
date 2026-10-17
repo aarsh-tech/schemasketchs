@@ -39,3 +39,7 @@ New exports: PDF fitted to an A4 page in the light theme (written by a small bui
 ## Installable offline app (#10)
 Schemasketch is now a PWA (vite-plugin-pwa): a web app manifest with new icons, and a service worker that precaches the app shell, fonts, the parse worker and the lazy chunks. The 15 MB SQL import worker isn't precached; it's cached the first time it's used.
 After the first visit the app opens offline, and when a new version is deployed an "Update available" toast offers to reload. Checked against a production preview: an offline reload renders the diagram, and a rebuilt deploy brings up the toast.
+
+## Live collaboration (#11)
+Start a live session and share the invite link: the DBML text and the layout live in a Yjs document synced peer to peer with y-webrtc, the editor is bound with y-codemirror.next (collaborators' cursors, and an undo that only undoes your own edits), and tables show the names of people who have them selected. Leaving keeps a local copy. Everything is loaded only when a session starts.
+The link carries an encryption key and, when it isn't the default, the signalling server. The public y-webrtc signalling servers were unreachable at the time, so `pnpm signaling` runs y-webrtc's own small server, and the dialog says when no server can be reached (tabs in one browser still connect). Tested with two separate browser profiles through a local signalling server: text, layout and selection sync both ways.
