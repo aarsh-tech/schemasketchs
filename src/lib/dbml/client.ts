@@ -1,3 +1,4 @@
+import type { SchemaEdit } from './edit'
 import type { ParseRequest, ParseResponse, SqlRequest, SqlResponse } from './protocol'
 import type { ImportDialect, ParseDiagnostic, SchemaModel, SqlDialect } from './types'
 
@@ -61,6 +62,13 @@ export async function exportSql(source: string, format: SqlDialect): Promise<str
   const res = await parseRpc({ type: 'export', source, format })
   if (res.type === 'export' && res.ok) return res.text
   throw new Error(res.type === 'export' && !res.ok ? res.error : 'Unexpected response')
+}
+
+/** Apply a canvas edit to DBML text. Throws with a message meant for the user. */
+export async function editDbml(source: string, edit: SchemaEdit): Promise<string> {
+  const res = await parseRpc({ type: 'edit', source, edit })
+  if (res.type === 'edit' && res.ok) return res.text
+  throw new Error(res.type !== 'parse' && !res.ok ? res.error : 'Unexpected response')
 }
 
 export async function importToDbml(source: string, format: ImportDialect): Promise<string> {

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
-import type { ComponentProps, ReactNode } from 'react'
+import type { ComponentProps, KeyboardEvent as ReactKeyboardEvent, ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 
@@ -58,6 +58,14 @@ export function Kbd({ children }: { children: ReactNode }) {
 
 /* ---------- dropdown menu ---------- */
 
+/** Move focus to the next/previous enabled button inside `container`, wrapping around. */
+function moveFocus(container: HTMLElement | null, dir: 1 | -1) {
+  const buttons = [...(container?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)') ?? [])]
+  if (!buttons.length) return
+  const i = buttons.indexOf(document.activeElement as HTMLButtonElement)
+  buttons[(i + dir + buttons.length) % buttons.length]?.focus()
+}
+
 export interface MenuItem {
   label: string
   icon?: ReactNode
@@ -108,10 +116,7 @@ export function Menu({
       if (e.key === 'Escape') close()
       if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
         e.preventDefault()
-        const buttons = [...(menuRef.current?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)') ?? [])]
-        const i = buttons.indexOf(document.activeElement as HTMLButtonElement)
-        const next = e.key === 'ArrowDown' ? (i + 1) % buttons.length : (i - 1 + buttons.length) % buttons.length
-        buttons[next]?.focus()
+        moveFocus(menuRef.current, e.key === 'ArrowDown' ? 1 : -1)
       }
     }
     window.addEventListener('pointerdown', onDown)
@@ -135,40 +140,185 @@ export function Menu({
               className="fixed z-[60] max-h-[70vh] overflow-y-auto rounded-lg border border-line bg-raised p-1 shadow-pop scrollbar-thin"
               style={{ top: pos.top, left: pos.left, width }}
             >
-              {items.map((item, i) => {
-                if (item === 'separator') return <div key={i} className="my-1 h-px bg-line" />
-                if ('heading' in item)
-                  return (
-                    <div key={i} className="px-2.5 pt-2 pb-1 text-[11.5px] font-medium text-ink-3">
-                      {item.heading}
-                    </div>
-                  )
-                return (
-                  <button
-                    key={i}
-                    type="button"
-                    role="menuitem"
-                    disabled={item.disabled}
-                    onClick={() => {
-                      setOpen(false)
-                      item.onSelect()
-                    }}
-                    className={cx(
-                      'flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-[13px] outline-none hover:bg-hover focus-visible:bg-hover disabled:opacity-40',
-                      item.danger ? 'text-danger' : 'text-ink',
-                    )}
-                  >
-                    {item.icon ? <span className="flex w-4 justify-center text-ink-2">{item.icon}</span> : null}
-                    <span className="flex-1 truncate">{item.label}</span>
-                    {item.hint ? <span className="font-mono text-[11px] text-ink-3">{item.hint}</span> : null}
-                  </button>
-                )
-              })}
+              <MenuItems
+                items={items}
+                onPick={(item) => {
+                  setOpen(false)
+                  item.onSelect()
+                }}
+              />
             </div>,
             document.body,
           )
         : null}
     </>
+  )
+}
+
+function MenuItems({ items, onPick }: { items: MenuEntry[]; onPick: (item: MenuItem) => void }) {
+  return (
+    <>
+      {items.map((item, i) => {
+        if (item === 'separator') return <div key={i} className="my-1 h-px bg-line" />
+        if ('heading' in item)
+          return (
+            <div key={i} className="px-2.5 pt-2 pb-1 text-[11.5px] font-medium text-ink-3">
+              {item.heading}
+            </div>
+          )
+        return (
+          <button
+            key={i}
+            type="button"
+            role="menuitem"
+            disabled={item.disabled}
+            onClick={() => onPick(item)}
+            className={cx(
+              'flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-[13px] outline-none hover:bg-hover focus-visible:bg-hover disabled:opacity-40',
+              item.danger ? 'text-danger' : 'text-ink',
+            )}
+          >
+            {item.icon ? <span className="flex w-4 justify-center text-ink-2">{item.icon}</span> : null}
+            <span className="flex-1 truncate">{item.label}</span>
+            {item.hint ? <span className="font-mono text-[11px] text-ink-3">{item.hint}</span> : null}
+          </button>
+        )
+      })}
+    </>
+  )
+}
+
+/* ---------- popover at a point ---------- */
+
+/**
+ * A floating panel anchored at viewport coordinates, kept on screen. Closes on
+ * Escape or a pointer press outside it, focuses its first control when it
+ * opens and hands focus back when it closes.
+ */
+export function Popover({
+  x,
+  y,
+  onClose,
+  label,
+  width = 288,
+  role = 'dialog',
+  className,
+  onKeyDown,
+  children,
+}: {
+  x: number
+  y: number
+  onClose: () => void
+  label: string
+  width?: number
+  role?: 'dialog' | 'menu'
+  className?: string
+  onKeyDown?: (e: ReactKeyboardEvent<HTMLDivElement>) => void
+  children: ReactNode
+}) {
+  const ref = useRef<HTMLDivElement>(null)
+  const closeRef = useRef(onClose)
+  useEffect(() => {
+    closeRef.current = onClose
+  })
+
+  // keep the panel inside the window; this is a DOM write, not React state
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const w = el.offsetWidth
+    const h = el.offsetHeight
+    el.style.left = `${Math.max(8, Math.min(x, window.innerWidth - w - 8))}px`
+    el.style.top = `${y + h > window.innerHeight - 8 ? Math.max(8, window.innerHeight - h - 8) : y}px`
+    el.style.visibility = 'visible'
+  }, [x, y])
+
+  useEffect(() => {
+    const before = document.activeElement as HTMLElement | null
+    const onDown = (e: PointerEvent) => {
+      if (!ref.current?.contains(e.target as Node)) closeRef.current()
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        closeRef.current()
+      }
+    }
+    window.addEventListener('pointerdown', onDown, true)
+    window.addEventListener('keydown', onKey)
+    const raf = requestAnimationFrame(() => {
+      const first = ref.current?.querySelector<HTMLElement>('[data-autofocus], input, select, textarea, button:not(:disabled)')
+      first?.focus()
+      if (first instanceof HTMLInputElement) first.select()
+    })
+    return () => {
+      cancelAnimationFrame(raf)
+      window.removeEventListener('pointerdown', onDown, true)
+      window.removeEventListener('keydown', onKey)
+      // only take focus back if it was left nowhere in particular
+      if ((document.activeElement === document.body || !document.activeElement) && before?.isConnected) before.focus({ preventScroll: true })
+    }
+  }, [])
+
+  return createPortal(
+    <div
+      ref={ref}
+      role={role}
+      aria-label={label}
+      onKeyDown={onKeyDown}
+      className={cx('fixed z-[60] max-h-[80vh] overflow-y-auto rounded-lg border border-line bg-raised text-ink shadow-pop scrollbar-thin', className)}
+      style={{ left: x, top: y, width: `min(${width}px, calc(100vw - 16px))`, visibility: 'hidden' }}
+    >
+      {children}
+    </div>,
+    document.body,
+  )
+}
+
+/** A menu that opens at a point, e.g. on right-click. */
+export function ContextMenu({
+  x,
+  y,
+  items,
+  label,
+  onClose,
+  width = 232,
+  children,
+}: {
+  x: number
+  y: number
+  items: MenuEntry[]
+  label: string
+  onClose: () => void
+  width?: number
+  /** extra content under the items, such as a colour row */
+  children?: ReactNode
+}) {
+  return (
+    <Popover
+      x={x}
+      y={y}
+      label={label}
+      role="menu"
+      width={width}
+      onClose={onClose}
+      className="p-1"
+      onKeyDown={(e) => {
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+          e.preventDefault()
+          moveFocus(e.currentTarget, e.key === 'ArrowDown' ? 1 : -1)
+        }
+      }}
+    >
+      <MenuItems
+        items={items}
+        onPick={(item) => {
+          onClose()
+          item.onSelect()
+        }}
+      />
+      {children}
+    </Popover>
   )
 }
 

@@ -1,6 +1,8 @@
 import type { Node } from '@xyflow/react'
 import { toast } from 'sonner'
-import { exportSql, importToDbml } from '@/lib/dbml/client'
+import { editorText, replaceEditorText, undoInEditor } from '@/components/editor/bridge'
+import { editDbml, exportSql, importToDbml } from '@/lib/dbml/client'
+import type { SchemaEdit } from '@/lib/dbml/edit'
 import type { ImportDialect, SqlDialect } from '@/lib/dbml/types'
 import { renderDiagram } from '@/lib/exportImage'
 import {
@@ -42,6 +44,47 @@ export function newProject(source = '', name?: string) {
 
 export function openProjectFile(file: ProjectFile) {
   useProjects.getState().createProject({ name: file.name, source: file.source, positions: file.positions })
+}
+
+/* ---------- edits made on the canvas ---------- */
+
+export type EditResult = { ok: true } | { ok: false; error: string }
+
+/**
+ * Apply a canvas edit to the DBML. The change goes through the editor, so it
+ * shows up there and Ctrl+Z undoes it. Errors are toasted unless `quiet`
+ * (popovers show them inline instead).
+ */
+export async function editSchema(edit: SchemaEdit, opts: { quiet?: boolean; done?: string; undoable?: boolean } = {}): Promise<EditResult> {
+  const fail = (error: string): EditResult => {
+    if (!opts.quiet) toast.error('Couldn’t change the schema', { description: error })
+    return { ok: false, error }
+  }
+  if (useUi.getState().diagnostics.length) {
+    return fail('The code has an error, so the diagram can’t be edited right now. Fix the underlined line in the editor first.')
+  }
+  // if someone types while the worker is busy, redo the edit on the new text
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const p = active()
+    if (!p) return fail('There is no schema open.')
+    const before = editorText() ?? p.source
+    let next: string
+    try {
+      next = await editDbml(before, edit)
+    } catch (err) {
+      return fail(errorText(err))
+    }
+    if (next === before) return { ok: true }
+    if (!replaceEditorText(before, next)) {
+      if (editorText() !== null) continue
+      // no editor mounted: write straight to the project
+      useProjects.getState().setSource(next)
+      useUi.getState().bumpEditor()
+    }
+    if (opts.done) toast.success(opts.done, opts.undoable ? { action: { label: 'Undo', onClick: () => undoInEditor() } } : undefined)
+    return { ok: true }
+  }
+  return fail('The code kept changing while the edit was being made. Try again.')
 }
 
 /* ---------- open ---------- */

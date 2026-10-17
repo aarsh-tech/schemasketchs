@@ -151,6 +151,73 @@
   height: 1px;
   border: 0;
 }
+/* drawing relationships: a dot on each side of a column row starts the drag,
+   and while dragging the whole row of any column is a drop target */
+.react-flow__handle.ss-connect {
+  width: 11px;
+  height: 11px;
+  min-width: 11px;
+  min-height: 11px;
+  border: 1.5px solid var(--c-accent);
+  border-radius: 50%;
+  background: var(--c-raised);
+  cursor: crosshair;
+  pointer-events: auto;
+  opacity: 0;
+  transition: opacity 100ms ease, transform 100ms ease;
+}
+.react-flow__handle.ss-connect:hover {
+  background: var(--c-accent);
+}
+.ss-row:hover .ss-connect,
+.ss-row:focus-visible .ss-connect,
+.react-flow__node.selected .ss-connect {
+  opacity: 1;
+}
+.is-connecting .ss-connect {
+  opacity: 0 !important;
+}
+.react-flow__handle.ss-drop {
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  transform: none;
+  border-radius: 0;
+  background: transparent;
+  opacity: 1;
+  pointer-events: none;
+}
+.is-connecting .react-flow__handle.ss-drop {
+  pointer-events: auto;
+  cursor: crosshair;
+}
+.react-flow__handle.ss-drop.valid,
+.react-flow__handle.ss-drop.connectingto {
+  background: color-mix(in srgb, var(--c-accent) 16%, transparent);
+  box-shadow: inset 2px 0 0 var(--c-accent);
+}
+.ss-table-menu {
+  opacity: 0;
+}
+.react-flow__node:hover .ss-table-menu,
+.react-flow__node.selected .ss-table-menu,
+.react-flow__node:focus-within .ss-table-menu {
+  opacity: 0.85;
+}
+@media (hover: none) {
+  .ss-table-menu {
+    opacity: 0.85;
+  }
+}
+.react-flow__connectionline {
+  z-index: 10;
+}
+/* group backgrounds are drawn above the edge layer; let clicks reach the edges */
+.react-flow__node-tableGroup {
+  pointer-events: none !important;
+}
 .react-flow__node {
   transition: opacity 120ms ease;
 }

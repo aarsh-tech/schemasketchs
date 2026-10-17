@@ -102,7 +102,7 @@ const SETTINGS = [
   'headercolor: ',
   'color: ',
 ]
-const TYPES = [
+export const COLUMN_TYPES = [
   'integer',
   'bigint',
   'smallint',
@@ -159,7 +159,7 @@ export function dbmlCompletions(getModel: () => SchemaModel) {
     if (insideBlock && tokensBefore.length >= 1 && before.match(/^\s*[\w"]+\s+[\w.]*$/)) {
       return {
         from: word.from,
-        options: [...TYPES.map((t) => ({ label: t, type: 'type' })), ...enums],
+        options: [...COLUMN_TYPES.map((t) => ({ label: t, type: 'type' })), ...enums],
         validFor: /^[\w.()]*$/,
       }
     }

@@ -2,6 +2,7 @@
 import Database from '@dbml-core-database'
 import ModelExporter from '@dbml-core-exporter'
 import { Compiler, DEFAULT_ENTRY, MemoryProjectLayout } from '@dbml/parse'
+import { EditError, applyEdit } from './edit'
 import { toDiagnostics, toSchemaModel } from './normalize'
 import type { ParseRequest, ParseResponse } from './protocol'
 import type { ParseDiagnostic } from './types'
@@ -40,6 +41,15 @@ function compile(source: string): Compiled {
 }
 
 function handle(req: ParseRequest): ParseResponse {
+  if (req.type === 'edit') {
+    try {
+      return { id: req.id, type: 'edit', ok: true, text: applyEdit(req.source, req.edit) }
+    } catch (err) {
+      const message = err instanceof EditError ? err.message : `Couldn’t make that change: ${toDiagnostics(err)[0].message}`
+      return { id: req.id, type: 'edit', ok: false, error: message }
+    }
+  }
+
   const { database, diagnostics } = compile(req.source)
 
   if (req.type === 'parse') {
