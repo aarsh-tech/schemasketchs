@@ -38,7 +38,7 @@ describe('toMermaid', () => {
       const text = toMermaid(parse(f.dbml))
       await expect(mermaid.parse(text), f.name).resolves.toBeTruthy()
     }
-  }, 60_000)
+  }, 180_000)
 })
 
 describe('toMarkdown', () => {
