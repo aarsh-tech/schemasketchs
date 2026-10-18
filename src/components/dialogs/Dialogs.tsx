@@ -930,27 +930,24 @@ function LiveBody({ onClose }: { onClose: () => void }) {
   const c = useCollab()
   const activeId = useProjects((s) => s.activeId)
   const sharedName = useProjects((s) => (c.projectId ? s.projects[c.projectId]?.name : null))
-  const [name, setName] = useState(c.name)
   const [relayText, setRelayText] = useState(c.relayText)
   const [turn, setTurn] = useState(c.turn)
   const [busy, setBusy] = useState(false)
   const link = c.room && c.key ? `${location.origin}${location.pathname}#${liveHash(c.room, c.key, c.network)}` : ''
   const turnInvalid = turn.url.trim() !== '' && !parseTurn(turn.url, turn.username, turn.credential)
   const saveNetwork = () => c.setNetworkSettings({ relayText, turn })
-
-  const nameField = (
-    <div className="grid gap-1">
-      <label htmlFor="live-name" className="text-[12px] font-medium text-ink-2">
-        Your name, shown to the others
-      </label>
-      <input id="live-name" value={name} maxLength={40} onChange={(e) => setName(e.target.value)} onBlur={() => c.setName(name)} className={FIELD} />
-    </div>
-  )
+  const start = async () => {
+    if (busy || turnInvalid) return
+    setBusy(true)
+    saveNetwork()
+    await useCollab.getState().start()
+    setBusy(false)
+  }
 
   if (c.status === 'off') {
     return (
       <div className="grid gap-3">
-        {nameField}
+        <LiveNameField onEnter={() => void start()} />
         <details className="rounded-lg border border-line px-3 py-2 text-[12.5px]" open={turnInvalid || undefined}>
           <summary className="cursor-pointer font-medium text-ink-2">Connection settings</summary>
           <div className="mt-2 grid gap-3">
@@ -994,17 +991,7 @@ function LiveBody({ onClose }: { onClose: () => void }) {
         </details>
         <div className="flex justify-end gap-2">
           <Button onClick={onClose}>Cancel</Button>
-          <Button
-            variant="primary"
-            disabled={busy || turnInvalid}
-            onClick={async () => {
-              setBusy(true)
-              c.setName(name)
-              saveNetwork()
-              await useCollab.getState().start()
-              setBusy(false)
-            }}
-          >
+          <Button variant="primary" disabled={busy || turnInvalid} onClick={() => void start()}>
             {busy ? <LoaderCircle size={14} className="animate-spin" /> : <Radio size={14} />} Start live session
           </Button>
         </div>
@@ -1051,7 +1038,7 @@ function LiveBody({ onClose }: { onClose: () => void }) {
           {c.peers.length === 0 ? <li className="text-[12.5px] text-ink-3">Nobody else yet. Send them the link.</li> : null}
         </ul>
       </div>
-      {nameField}
+      <LiveNameField />
       <div className="flex justify-end gap-2 border-t border-line pt-3">
         <Button
           variant="outline"
@@ -1071,9 +1058,48 @@ function LiveBody({ onClose }: { onClose: () => void }) {
   )
 }
 
+/**
+ * Your name in a live session. Saved as you type, so closing the dialog never
+ * loses it, and the others see the change straight away.
+ */
+function LiveNameField({ autoFocus, onEnter }: { autoFocus?: boolean; onEnter?: () => void }) {
+  const [name, setName] = useState(() => useCollab.getState().name)
+  return (
+    <div className="grid gap-1">
+      <label htmlFor="live-name" className="text-[12px] font-medium text-ink-2">
+        Your name, shown to the others
+      </label>
+      <input
+        id="live-name"
+        value={name}
+        maxLength={40}
+        data-autofocus={autoFocus || undefined}
+        autoComplete="nickname"
+        onFocus={(e) => e.currentTarget.select()}
+        onChange={(e) => {
+          setName(e.target.value)
+          useCollab.getState().setName(e.target.value)
+        }}
+        // left empty, it goes back to the name you had
+        onBlur={() => setName(useCollab.getState().name)}
+        onKeyDown={(e) => {
+          if (e.key !== 'Enter') return
+          e.preventDefault()
+          onEnter?.()
+        }}
+        className={FIELD}
+      />
+    </div>
+  )
+}
+
 function LiveJoinDialog({ dialog, onClose }: { dialog: { room: string; key: string; network: Network } | null; onClose: () => void }) {
   const notNow = () => {
     history.replaceState(null, '', location.pathname + location.search)
+    onClose()
+  }
+  const join = () => {
+    if (dialog) void useCollab.getState().join(dialog.room, dialog.key, dialog.network)
     onClose()
   }
   return (
@@ -1086,20 +1112,18 @@ function LiveJoinDialog({ dialog, onClose }: { dialog: { room: string; key: stri
       footer={
         <>
           <Button onClick={notNow}>Not now</Button>
-          <Button
-            variant="primary"
-            autoFocus
-            onClick={() => {
-              if (dialog) void useCollab.getState().join(dialog.room, dialog.key, dialog.network)
-              onClose()
-            }}
-          >
+          <Button variant="primary" onClick={join}>
             <Radio size={14} /> Join session
           </Button>
         </>
       }
     >
-      <p className="text-[12.5px] text-ink-2">{PRIVACY}</p>
+      {dialog ? (
+        <div className="grid gap-3">
+          <LiveNameField autoFocus onEnter={join} />
+          <p className="text-[12.5px] text-ink-2">{PRIVACY}</p>
+        </div>
+      ) : null}
     </Dialog>
   )
 }
