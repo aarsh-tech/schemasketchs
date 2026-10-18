@@ -455,12 +455,6 @@ function HelpDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
               </div>
             ))}
           </dl>
-          <p className="mt-4 text-[12.5px] text-ink-2">
-            Your schemas live in this browser's storage. Save to a file to keep a copy or move it to another machine. Full syntax:{' '}
-            <a className="text-accent underline underline-offset-2" href="https://dbml.dbdiagram.io/docs" target="_blank" rel="noreferrer">
-              dbml.dbdiagram.io/docs
-            </a>
-          </p>
         </div>
       </div>
     </Dialog>
