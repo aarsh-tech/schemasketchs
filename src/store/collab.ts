@@ -5,7 +5,7 @@ import { toast } from 'sonner'
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { setUndoOverride } from '@/components/editor/bridge'
-import { DEFAULT_NETWORK, liveHash, parseRelays, parseTurn, randomIdentity } from '@/lib/collab/link'
+import { DEFAULT_NETWORK, distinctIdentity, liveHash, parseRelays, parseTurn, randomIdentity } from '@/lib/collab/link'
 import type { Network, Turn } from '@/lib/collab/link'
 import type { Peer, Session } from '@/lib/collab/session'
 import type { XY } from '@/lib/views'
@@ -86,13 +86,28 @@ export const useCollab = create<CollabState>()(
         const project = useProjects.getState().projects[projectId]
         if (!project || get().room !== room) return
         const s = get()
+        let checkedIdentity = seed
         session = startSession({
           room,
           key,
           network,
           me: { name: s.name, color: s.color },
           seed: seed ? { source: project.source, positions: project.positions } : undefined,
-          onPeers: (peers) => set(peers.length > get().peers.length ? { peers, blocked: false } : { peers }),
+          onPeers: (peers) => {
+            // joining with a name or colour that's already here (another tab of this browser shares the saved name) gets a new one
+            if (!checkedIdentity && peers.length) {
+              checkedIdentity = true
+              const me = get()
+              const fresh = distinctIdentity(me, peers)
+              if (fresh) {
+                set(fresh)
+                session?.setMe(fresh)
+                if (fresh.name !== me.name)
+                  toast(`You’re ${fresh.name} in this session`, { description: `Someone here is already called ${me.name}. Change your name in the live session dialog.` })
+              }
+            }
+            set(peers.length > get().peers.length ? { peers, blocked: false } : { peers })
+          },
           onBlocked: () => set({ blocked: true }),
           onRemotePositions: (positions) => {
             useProjects.getState().mergePositions(projectId, positions)

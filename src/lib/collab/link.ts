@@ -87,6 +87,34 @@ export function randomIdentity(rand: () => number = Math.random): { name: string
   return { name: `${pick(ADJECTIVES)} ${pick(ANIMALS)}`, color: pick(PEER_COLORS) }
 }
 
+/**
+ * A name and colour nobody else in the session has, for someone who just
+ * joined (often another tab of the same browser, which shares the saved name).
+ * Null when theirs are already distinct.
+ */
+export function distinctIdentity(
+  me: { name: string; color: string },
+  others: { name: string; color: string }[],
+  rand: () => number = Math.random,
+): { name: string; color: string } | null {
+  const names = new Set(others.map((o) => o.name.toLowerCase()))
+  const colors = new Set(others.map((o) => o.color))
+  const nameTaken = names.has(me.name.toLowerCase())
+  const colorTaken = colors.has(me.color)
+  if (!nameTaken && !colorTaken) return null
+  let name = me.name
+  for (let i = 0; nameTaken && i < 50; i++) {
+    const candidate = randomIdentity(rand).name
+    if (!names.has(candidate.toLowerCase())) {
+      name = candidate
+      break
+    }
+  }
+  const free = PEER_COLORS.filter((c) => !colors.has(c))
+  const color = colorTaken && free.length ? free[Math.floor(rand() * free.length) % free.length] : me.color
+  return { name, color }
+}
+
 export const initials = (name: string) =>
   name
     .split(/\s+/)

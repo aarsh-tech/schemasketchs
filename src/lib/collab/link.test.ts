@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_RELAYS, initials, liveHash, parseRelays, parseTurn, randomIdentity, readLiveHash } from './link'
+import { DEFAULT_RELAYS, PEER_COLORS, distinctIdentity, initials, liveHash, parseRelays, parseTurn, randomIdentity, readLiveHash } from './link'
 
 describe('live links', () => {
   it('round-trips a room and key through the hash', () => {
@@ -51,6 +51,26 @@ describe('identities', () => {
     expect(initials('Quiet Heron')).toBe('QH')
     expect(initials('  ada ')).toBe('A')
     expect(initials('')).toBe('?')
+  })
+})
+
+describe('distinctIdentity', () => {
+  it('keeps a name and colour nobody else has', () => {
+    expect(distinctIdentity({ name: 'Riya', color: '#2f7dd1' }, [{ name: 'Aarsh', color: '#d9480f' }])).toBeNull()
+    expect(distinctIdentity({ name: 'Riya', color: '#2f7dd1' }, [])).toBeNull()
+  })
+
+  it('renames someone whose name is taken, ignoring case, and frees their colour', () => {
+    const others = [{ name: 'Aarsh', color: '#d9480f' }]
+    const fresh = distinctIdentity({ name: 'aarsh', color: '#d9480f' }, others)
+    expect(fresh?.name).not.toMatch(/^aarsh$/i)
+    expect(fresh?.name).toMatch(/^[A-Z][a-z]+ [A-Z][a-z]+$/)
+    expect(fresh?.color).not.toBe('#d9480f')
+    expect(PEER_COLORS).toContain(fresh?.color)
+  })
+
+  it('only changes the colour when just the colour clashes', () => {
+    expect(distinctIdentity({ name: 'Riya', color: '#d9480f' }, [{ name: 'Aarsh', color: '#d9480f' }])).toEqual({ name: 'Riya', color: expect.not.stringMatching('#d9480f') })
   })
 })
 
