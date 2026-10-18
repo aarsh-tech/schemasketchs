@@ -1,29 +1,80 @@
 /* Live session links and identities. Small and pure, so it stays in the main
    bundle; everything that talks to the network is in session.ts. */
 
-export const DEFAULT_SIGNALING = ['wss://signaling.yjs.dev']
-
 /**
- * #live=<room>.<key>, plus &sig=<servers> when the session doesn't use the
- * default signalling server (everyone has to use the same one). The key never
- * reaches a server; it only encrypts what passes through one.
+ * Public Nostr relays the browsers use to find each other. They only pass on
+ * the encrypted connection setup; edits go browser to browser. All of these
+ * forwarded the short-lived events this needs when checked on 2026-10-18, and
+ * a session keeps working while any one of them is up.
  */
-export function liveHash(room: string, key: string, signaling: string[] = DEFAULT_SIGNALING): string {
-  const custom = signaling.length && signaling.join(' ') !== DEFAULT_SIGNALING.join(' ')
-  return `live=${room}.${key}${custom ? `&sig=${encodeURIComponent(signaling.join(' '))}` : ''}`
+export const DEFAULT_RELAYS = [
+  'wss://relay.damus.io',
+  'wss://nos.lol',
+  'wss://relay.primal.net',
+  'wss://nostr.mom',
+  'wss://relay.snort.social',
+  'wss://nostr.oxtr.dev',
+  'wss://relay.nostr.net',
+  'wss://offchain.pub',
+]
+
+/** A TURN server relays the connection itself, for networks that block direct ones. */
+export interface Turn {
+  url: string
+  username: string
+  credential: string
 }
 
-export function readLiveHash(hash: string): { room: string; key: string; signaling: string[] } | null {
+/** How a session's browsers reach each other. Everyone in a session uses the same one. */
+export interface Network {
+  relays: string[]
+  turn: Turn | null
+}
+
+export const DEFAULT_NETWORK: Network = { relays: DEFAULT_RELAYS, turn: null }
+
+const sameList = (a: string[], b: string[]) => a.length === b.length && a.every((x, i) => x === b[i])
+
+/**
+ * #live=<room>.<key>, plus &relays= when the session doesn't use the default
+ * relays and &turn=&tu=&tc= when it has a TURN server. The key never reaches a
+ * server; it only encrypts what passes through one.
+ */
+export function liveHash(room: string, key: string, network: Network = DEFAULT_NETWORK): string {
+  let hash = `live=${room}.${key}`
+  if (network.relays.length && !sameList(network.relays, DEFAULT_RELAYS)) hash += `&relays=${encodeURIComponent(network.relays.join(' '))}`
+  if (network.turn) {
+    hash += `&turn=${encodeURIComponent(network.turn.url)}`
+    if (network.turn.username) hash += `&tu=${encodeURIComponent(network.turn.username)}`
+    if (network.turn.credential) hash += `&tc=${encodeURIComponent(network.turn.credential)}`
+  }
+  return hash
+}
+
+export function readLiveHash(hash: string): { room: string; key: string; network: Network } | null {
   const m = /(?:^#?|&)live=([A-Za-z0-9_-]{8,64})\.([A-Za-z0-9_-]{8,128})(?:&|$)/.exec(hash)
   if (!m) return null
-  const sig = /(?:^#?|&)sig=([^&]*)/.exec(hash)?.[1]
-  let signaling: string[] = []
-  try {
-    signaling = sig ? parseSignaling(decodeURIComponent(sig)) : []
-  } catch {
-    /* a mangled sig falls back to the default server */
-  }
-  return { room: m[1], key: m[2], signaling: signaling.length ? signaling : DEFAULT_SIGNALING }
+  // links from before relays carried &sig=<y-webrtc server>; those servers are gone, so it's ignored
+  const params = new URLSearchParams(hash.replace(/^#/, ''))
+  const relays = parseRelays(params.get('relays') ?? '')
+  const turn = parseTurn(params.get('turn') ?? '', params.get('tu') ?? '', params.get('tc') ?? '')
+  return { room: m[1], key: m[2], network: { relays: relays.length ? relays : DEFAULT_RELAYS, turn } }
+}
+
+/** Relay addresses typed one per line (or comma separated); only ws:// and wss:// URLs count. */
+export function parseRelays(text: string): string[] {
+  const urls = text
+    .split(/[\s,]+/)
+    .map((s) => s.trim())
+    .filter((s) => /^wss?:\/\/[^\s/]+/i.test(s))
+  return [...new Set(urls)]
+}
+
+/** A TURN server from the form, or null when the address isn't a turn: or turns: URL. */
+export function parseTurn(url: string, username: string, credential: string): Turn | null {
+  const clean = url.trim()
+  if (!/^turns?:[^\s]+$/i.test(clean)) return null
+  return { url: clean, username: username.trim(), credential: credential.trim() }
 }
 
 const ADJECTIVES = ['Quiet', 'Brisk', 'Bright', 'Calm', 'Clever', 'Gentle', 'Keen', 'Lively', 'Merry', 'Nimble', 'Swift', 'Witty']
@@ -34,15 +85,6 @@ export const PEER_COLORS = ['#d9480f', '#2f7dd1', '#9c36b5', '#2b8a3e', '#c2255c
 export function randomIdentity(rand: () => number = Math.random): { name: string; color: string } {
   const pick = <T,>(list: T[]) => list[Math.floor(rand() * list.length) % list.length]
   return { name: `${pick(ADJECTIVES)} ${pick(ANIMALS)}`, color: pick(PEER_COLORS) }
-}
-
-/** Signalling servers typed one per line (or comma separated); only ws:// and wss:// URLs count. */
-export function parseSignaling(text: string): string[] {
-  const urls = text
-    .split(/[\s,]+/)
-    .map((s) => s.trim())
-    .filter((s) => /^wss?:\/\/[^\s/]+/i.test(s))
-  return [...new Set(urls)]
 }
 
 export const initials = (name: string) =>

@@ -5,13 +5,14 @@ import { toast } from 'sonner'
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { setUndoOverride } from '@/components/editor/bridge'
-import { DEFAULT_SIGNALING, liveHash, parseSignaling, randomIdentity } from '@/lib/collab/link'
+import { DEFAULT_NETWORK, liveHash, parseRelays, parseTurn, randomIdentity } from '@/lib/collab/link'
+import type { Network, Turn } from '@/lib/collab/link'
 import type { Peer, Session } from '@/lib/collab/session'
 import type { XY } from '@/lib/views'
 import { useProjects } from './projects'
 import { useUi } from './ui'
 
-/* Live collaboration. The Yjs session itself (yjs, y-webrtc, the CodeMirror
+/* Live collaboration. The Yjs session itself (yjs, Trystero, the CodeMirror
    binding) is loaded only when someone starts or joins one. */
 
 export type { Peer } from '@/lib/collab/session'
@@ -23,23 +24,34 @@ interface CollabState {
   /** the schema that's shared */
   projectId: string | null
   peers: Peer[]
-  /** null until the first check */
-  signalingOk: boolean | null
+  /** relays this browser reaches; null until the first check */
+  relays: { connected: number; total: number } | null
+  /** someone found the session but couldn't connect directly (a TURN server fixes that) */
+  blocked: boolean
   /** CodeMirror extension for the shared project's editor */
   editorExtension: Extension | null
 
   /* remembered in this browser */
   name: string
   color: string
-  signaling: string
+  /** relays for sessions started here, one per line; empty means the defaults */
+  relayText: string
+  /** TURN server for sessions started here; an empty url means none */
+  turn: Turn
 
-  /** signalling servers of the running session */
-  servers: string[]
+  /** how the running session's browsers reach each other */
+  network: Network
   start: () => Promise<void>
-  join: (room: string, key: string, signaling: string[]) => Promise<void>
+  join: (room: string, key: string, network: Network) => Promise<void>
   leave: (opts?: { quiet?: boolean }) => void
   setName: (name: string) => void
-  setSignaling: (text: string) => void
+  setNetworkSettings: (settings: { relayText?: string; turn?: Turn }) => void
+}
+
+/** the network a new session uses, from what's typed in the dialog */
+export function networkFromSettings(relayText: string, turn: Turn): Network {
+  const relays = parseRelays(relayText)
+  return { relays: relays.length ? relays : DEFAULT_NETWORK.relays, turn: parseTurn(turn.url, turn.username, turn.credential) }
 }
 
 let session: Session | null = null
@@ -67,9 +79,9 @@ const identity = randomIdentity()
 export const useCollab = create<CollabState>()(
   persist(
     (set, get) => {
-      async function open(projectId: string, room: string, key: string, seed: boolean, servers: string[]) {
+      async function open(projectId: string, room: string, key: string, seed: boolean, network: Network) {
         get().leave({ quiet: true })
-        set({ status: 'connecting', room, key, projectId, peers: [], signalingOk: null, servers })
+        set({ status: 'connecting', room, key, projectId, peers: [], relays: null, blocked: false, network })
         const { startSession } = await import('@/lib/collab/session')
         const project = useProjects.getState().projects[projectId]
         if (!project || get().room !== room) return
@@ -77,10 +89,11 @@ export const useCollab = create<CollabState>()(
         session = startSession({
           room,
           key,
-          signaling: servers,
+          network,
           me: { name: s.name, color: s.color },
           seed: seed ? { source: project.source, positions: project.positions } : undefined,
-          onPeers: (peers) => set({ peers }),
+          onPeers: (peers) => set(peers.length > get().peers.length ? { peers, blocked: false } : { peers }),
+          onBlocked: () => set({ blocked: true }),
           onRemotePositions: (positions) => {
             useProjects.getState().mergePositions(projectId, positions)
             moveListeners.forEach((cb) => cb(projectId, positions))
@@ -103,11 +116,16 @@ export const useCollab = create<CollabState>()(
             if (useProjects.getState().activeId !== projectId) useProjects.getState().patchProject(projectId, { source: live.text() })
           }),
         )
-        const timer = setInterval(() => set({ signalingOk: live.signalingConnected() }), 1500)
+        const checkRelays = () => {
+          const now = live.relayStatus()
+          const was = get().relays
+          if (!was || was.connected !== now.connected || was.total !== now.total) set({ relays: now })
+        }
+        const timer = setInterval(checkRelays, 1500)
         cleanup.push(() => clearInterval(timer))
 
         set({ status: 'live', editorExtension: live.editorExtension })
-        history.replaceState(null, '', `${location.pathname}${location.search}#${liveHash(room, key, servers)}`)
+        history.replaceState(null, '', `${location.pathname}${location.search}#${liveHash(room, key, network)}`)
         // remount the editor with the shared binding
         if (useProjects.getState().activeId === projectId) useUi.getState().bumpEditor()
       }
@@ -118,26 +136,28 @@ export const useCollab = create<CollabState>()(
         key: null,
         projectId: null,
         peers: [],
-        signalingOk: null,
+        relays: null,
+        blocked: false,
         editorExtension: null,
-        servers: DEFAULT_SIGNALING,
+        network: DEFAULT_NETWORK,
         name: identity.name,
         color: identity.color,
-        signaling: DEFAULT_SIGNALING.join('\n'),
+        relayText: '',
+        turn: { url: '', username: '', credential: '' },
 
         async start() {
           const { activeId } = useProjects.getState()
-          const servers = parseSignaling(get().signaling)
-          await open(activeId, nanoid(16), nanoid(24), true, servers.length ? servers : DEFAULT_SIGNALING)
+          const { relayText, turn } = get()
+          await open(activeId, nanoid(16), nanoid(24), true, networkFromSettings(relayText, turn))
         },
 
-        async join(room, key, signaling) {
+        async join(room, key, network) {
           const store = useProjects.getState()
           // rejoining a room this browser was already in reuses that schema
           const existing = Object.values(store.projects).find((p) => p.liveRoom === room)
           const id = existing?.id ?? store.createProject({ name: 'Live session', source: '' })
           store.setActive(id)
-          await open(id, room, key, false, signaling)
+          await open(id, room, key, false, network)
         },
 
         leave(opts) {
@@ -148,7 +168,7 @@ export const useCollab = create<CollabState>()(
           session?.destroy()
           session = null
           setUndoOverride(null)
-          set({ status: 'off', room: null, key: null, projectId: null, peers: [], signalingOk: null, editorExtension: null })
+          set({ status: 'off', room: null, key: null, projectId: null, peers: [], relays: null, blocked: false, editorExtension: null })
           if (projectId) useProjects.getState().patchProject(projectId, { liveRoom: undefined })
           if (/live=/.test(location.hash)) history.replaceState(null, '', location.pathname + location.search)
           if (projectId && useProjects.getState().activeId === projectId) useUi.getState().bumpEditor()
@@ -162,12 +182,19 @@ export const useCollab = create<CollabState>()(
           session?.setMe({ name: clean, color: get().color })
         },
 
-        setSignaling: (signaling) => set({ signaling }),
+        setNetworkSettings: (settings) => set(settings),
       }
     },
     {
       name: 'schemasketch:collab',
-      partialize: (s) => ({ name: s.name, color: s.color, signaling: s.signaling }) as CollabState,
+      version: 1,
+      partialize: (s) => ({ name: s.name, color: s.color, relayText: s.relayText, turn: s.turn }) as CollabState,
+      // version 0 kept y-webrtc signalling servers, which aren't Nostr relays: keep only the identity
+      migrate: (persisted, version) => {
+        const old = (persisted ?? {}) as Partial<CollabState>
+        if (version < 1) return { name: old.name ?? identity.name, color: old.color ?? identity.color } as CollabState
+        return old as CollabState
+      },
     },
   ),
 )

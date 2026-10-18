@@ -3,13 +3,15 @@ import { Prec } from '@codemirror/state'
 import type { EditorView } from '@codemirror/view'
 import { keymap } from '@codemirror/view'
 import { yCollab, ySyncAnnotation, ySyncFacet, yUndoManagerKeymap } from 'y-codemirror.next'
-import { WebrtcProvider } from 'y-webrtc'
+import { Awareness } from 'y-protocols/awareness'
 import * as Y from 'yjs'
 import type { XY } from '@/lib/views'
+import type { Network } from './link'
+import { connect } from './transport'
 
 /* A live session: one Yjs document holding the DBML text and the table
-   positions, shared peer to peer over WebRTC. Loaded on demand; the app
-   talks to it through store/collab.ts. */
+   positions, shared peer to peer (see transport.ts). Loaded on demand; the
+   app talks to it through store/collab.ts. */
 
 export interface Me {
   name: string
@@ -24,14 +26,16 @@ export interface Peer extends Me {
 
 export interface SessionOptions {
   room: string
-  /** shared secret from the link: the signalling server only ever sees encrypted messages */
+  /** shared secret from the link: relays only ever see encrypted connection setup */
   key: string
-  signaling: string[]
+  network: Network
   me: Me
   /** the host fills the shared document from their schema; people joining start empty */
   seed?: { source: string; positions: Record<string, XY> }
   onPeers: (peers: Peer[]) => void
   onRemotePositions: (positions: Record<string, XY>) => void
+  /** someone found the session but their network and ours couldn't connect directly */
+  onBlocked: () => void
 }
 
 export interface Session {
@@ -45,8 +49,8 @@ export interface Session {
   setPositions: (positions: Record<string, XY>) => void
   setTable: (table: string | null) => void
   setMe: (me: Me) => void
-  /** whether any signalling server is reachable (people on other devices need one) */
-  signalingConnected: () => boolean
+  /** how many relays are reachable (people on other devices need at least one in common) */
+  relayStatus: () => { connected: number; total: number }
   peerCount: () => number
   onTextChange: (cb: () => void) => () => void
   destroy: () => void
@@ -65,8 +69,7 @@ export function startSession(opts: SessionOptions): Session {
     }, LOCAL)
   }
 
-  const provider = new WebrtcProvider(`schemasketch-${opts.room}`, doc, { signaling: opts.signaling, password: opts.key })
-  const awareness = provider.awareness
+  const awareness = new Awareness(doc)
   const light = (c: string) => `${c}33`
   awareness.setLocalStateField('user', { name: opts.me.name, color: opts.me.color, colorLight: light(opts.me.color) })
   awareness.setLocalStateField('table', null)
@@ -94,6 +97,8 @@ export function startSession(opts: SessionOptions): Session {
     if (Object.keys(changed).length) opts.onRemotePositions(changed)
   })
 
+  const transport = connect({ room: opts.room, key: opts.key, network: opts.network, doc, awareness, onBlocked: opts.onBlocked })
+
   const undoManager = new Y.UndoManager(ytext)
   const editorExtension: Extension = [yCollab(ytext, awareness, { undoManager }), Prec.high(keymap.of(yUndoManagerKeymap))]
 
@@ -119,7 +124,7 @@ export function startSession(opts: SessionOptions): Session {
     },
     setTable: (table) => awareness.setLocalStateField('table', table),
     setMe: (me) => awareness.setLocalStateField('user', { name: me.name, color: me.color, colorLight: light(me.color) }),
-    signalingConnected: () => provider.signalingConns.some((c) => c.connected),
+    relayStatus: () => transport.relayStatus(),
     peerCount: () => Math.max(0, awareness.getStates().size - 1),
     onTextChange(cb) {
       ytext.observe(cb)
@@ -127,7 +132,8 @@ export function startSession(opts: SessionOptions): Session {
     },
     destroy() {
       awareness.off('change', publishPeers)
-      provider.destroy()
+      transport.destroy()
+      awareness.destroy()
       doc.destroy()
     },
   }

@@ -13,7 +13,8 @@ import { baseName, clearShareHash, downloadText, embedCode, guessTextKind, slug 
 import type { EmbedTheme } from '@/lib/files'
 import { IDLE_MS, deleteVersions, describeDelta, tableDelta } from '@/lib/history'
 import { neighbours } from '@/lib/views'
-import { liveHash } from '@/lib/collab/link'
+import { DEFAULT_RELAYS, liveHash, parseTurn } from '@/lib/collab/link'
+import type { Network } from '@/lib/collab/link'
 import { useCollab } from '@/store/collab'
 import type { Version } from '@/lib/history'
 import { useHistory } from '@/store/history'
@@ -455,12 +456,6 @@ function HelpDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
               </div>
             ))}
           </dl>
-          <p className="mt-4 text-[12.5px] text-ink-2">
-            Your schemas live in this browser's storage. Save to a file to keep a copy or move it to another machine. Full syntax:{' '}
-            <a className="text-accent underline underline-offset-2" href="https://dbml.dbdiagram.io/docs" target="_blank" rel="noreferrer">
-              dbml.dbdiagram.io/docs
-            </a>
-          </p>
         </div>
       </div>
     </Dialog>
@@ -906,7 +901,9 @@ function SeedBody() {
 
 /* ---------- live sessions ---------- */
 
-const PRIVACY = 'Edits travel straight between browsers over WebRTC, encrypted with a key that only exists in the link. Public signalling servers only help browsers find each other; they see the encrypted connection setup, never your schema.'
+const PRIVACY = 'Anyone with the link can join from anywhere. Edits travel straight between browsers, encrypted with a key that only exists in the link. Public relays only help browsers find each other; they see the encrypted connection setup, never your schema.'
+
+const FIELD = 'h-8 min-w-0 rounded-md border border-line-strong bg-panel px-2.5 text-[13px] outline-none focus:border-accent'
 
 function LiveDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const status = useCollab((s) => s.status)
@@ -917,28 +914,36 @@ function LiveDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   )
 }
 
+/** What the live dialog says about the connection, and whether it's a problem. */
+function liveStatus(c: ReturnType<typeof useCollab.getState>): { tone: 'wait' | 'ok' | 'warn'; text: string } {
+  if (!c.relays) return { tone: 'wait', text: 'Connecting to the relays…' }
+  if (c.relays.connected === 0)
+    return { tone: 'warn', text: 'Can’t reach any relay, so only tabs in this browser can join. Check your internet connection; it keeps retrying on its own.' }
+  if (c.blocked && c.peers.length === 0)
+    return c.network.turn
+      ? { tone: 'warn', text: 'Someone found the session but couldn’t connect, even through your TURN server. Check its address, username and password.' }
+      : { tone: 'warn', text: 'Someone found the session, but your networks block a direct connection. Leave, add a TURN server under Connection settings, and send the new link.' }
+  return { tone: 'ok', text: `Online through ${c.relays.connected} of ${c.relays.total} relays. Anyone with the link can join while you’re here.` }
+}
+
 function LiveBody({ onClose }: { onClose: () => void }) {
   const c = useCollab()
   const activeId = useProjects((s) => s.activeId)
   const sharedName = useProjects((s) => (c.projectId ? s.projects[c.projectId]?.name : null))
   const [name, setName] = useState(c.name)
-  const [signaling, setSignaling] = useState(c.signaling)
+  const [relayText, setRelayText] = useState(c.relayText)
+  const [turn, setTurn] = useState(c.turn)
   const [busy, setBusy] = useState(false)
-  const link = c.room && c.key ? `${location.origin}${location.pathname}#${liveHash(c.room, c.key, c.servers)}` : ''
+  const link = c.room && c.key ? `${location.origin}${location.pathname}#${liveHash(c.room, c.key, c.network)}` : ''
+  const turnInvalid = turn.url.trim() !== '' && !parseTurn(turn.url, turn.username, turn.credential)
+  const saveNetwork = () => c.setNetworkSettings({ relayText, turn })
 
   const nameField = (
     <div className="grid gap-1">
       <label htmlFor="live-name" className="text-[12px] font-medium text-ink-2">
         Your name, shown to the others
       </label>
-      <input
-        id="live-name"
-        value={name}
-        maxLength={40}
-        onChange={(e) => setName(e.target.value)}
-        onBlur={() => c.setName(name)}
-        className="h-8 rounded-md border border-line-strong bg-panel px-2.5 text-[13px] outline-none focus:border-accent"
-      />
+      <input id="live-name" value={name} maxLength={40} onChange={(e) => setName(e.target.value)} onBlur={() => c.setName(name)} className={FIELD} />
     </div>
   )
 
@@ -946,29 +951,56 @@ function LiveBody({ onClose }: { onClose: () => void }) {
     return (
       <div className="grid gap-3">
         {nameField}
-        <details className="rounded-lg border border-line px-3 py-2 text-[12.5px]">
-          <summary className="cursor-pointer font-medium text-ink-2">Signalling servers</summary>
-          <p className="mt-2 text-ink-2">
-            One per line. Everyone in a session must use the same one. Tabs in this browser always find each other; people on other devices need a server both can reach. Run your own with <code className="font-mono">pnpm signaling</code> (or <code className="font-mono">npx y-webrtc</code>), then enter its ws:// address here.
-          </p>
-          <textarea
-            value={signaling}
-            onChange={(e) => setSignaling(e.target.value)}
-            onBlur={() => c.setSignaling(signaling)}
-            aria-label="Signalling server addresses"
-            spellCheck={false}
-            className="mt-2 h-16 w-full resize-y rounded-md border border-line-strong bg-panel p-2 font-mono text-[12px] outline-none focus:border-accent"
-          />
+        <details className="rounded-lg border border-line px-3 py-2 text-[12.5px]" open={turnInvalid || undefined}>
+          <summary className="cursor-pointer font-medium text-ink-2">Connection settings</summary>
+          <div className="mt-2 grid gap-3">
+            <div className="grid gap-1">
+              <label htmlFor="live-relays" className="text-[12px] font-medium text-ink-2">
+                Relays
+              </label>
+              <p className="text-ink-2">Public Nostr relays that help browsers find each other, one per line. Leave it empty to use the built-in list. The invite link carries your choice, so everyone uses the same relays.</p>
+              <textarea
+                id="live-relays"
+                value={relayText}
+                onChange={(e) => setRelayText(e.target.value)}
+                onBlur={saveNetwork}
+                placeholder={DEFAULT_RELAYS.join('\n')}
+                spellCheck={false}
+                className="h-20 w-full resize-y rounded-md border border-line-strong bg-panel p-2 font-mono text-[12px] outline-none placeholder:text-ink-3 focus:border-accent"
+              />
+            </div>
+            <fieldset className="grid gap-1">
+              <legend className="mb-1 text-[12px] font-medium text-ink-2">TURN server (optional)</legend>
+              <p className="text-ink-2">
+                Most networks connect directly. Strict office, school or mobile networks can need a TURN server to relay the connection: get one from a provider such as Metered, Cloudflare or Twilio, or run coturn. The invite link carries it, password included.
+              </p>
+              <input
+                aria-label="TURN server address"
+                aria-invalid={turnInvalid}
+                value={turn.url}
+                onChange={(e) => setTurn({ ...turn, url: e.target.value })}
+                onBlur={saveNetwork}
+                placeholder="turn:turn.example.com:3478"
+                spellCheck={false}
+                className={cx(FIELD, 'font-mono text-[12px]')}
+              />
+              <div className="grid grid-cols-2 gap-2">
+                <input aria-label="TURN username" value={turn.username} onChange={(e) => setTurn({ ...turn, username: e.target.value })} onBlur={saveNetwork} placeholder="Username" autoComplete="off" spellCheck={false} className={FIELD} />
+                <input aria-label="TURN password" type="password" value={turn.credential} onChange={(e) => setTurn({ ...turn, credential: e.target.value })} onBlur={saveNetwork} placeholder="Password" autoComplete="off" className={FIELD} />
+              </div>
+              {turnInvalid ? <p className="text-danger">The address must start with turn: or turns:, like turn:turn.example.com:3478.</p> : null}
+            </fieldset>
+          </div>
         </details>
         <div className="flex justify-end gap-2">
           <Button onClick={onClose}>Cancel</Button>
           <Button
             variant="primary"
-            disabled={busy}
+            disabled={busy || turnInvalid}
             onClick={async () => {
               setBusy(true)
               c.setName(name)
-              c.setSignaling(signaling)
+              saveNetwork()
               await useCollab.getState().start()
               setBusy(false)
             }}
@@ -980,6 +1012,7 @@ function LiveBody({ onClose }: { onClose: () => void }) {
     )
   }
 
+  const status = liveStatus(c)
   return (
     <div className="grid gap-3">
       {c.projectId !== activeId ? (
@@ -993,19 +1026,15 @@ function LiveBody({ onClose }: { onClose: () => void }) {
       <div className="grid gap-1">
         <span className="text-[12px] font-medium text-ink-2">Invite link</span>
         <div className="flex gap-2">
-          <input readOnly value={link} onFocus={(e) => e.currentTarget.select()} aria-label="Invite link" className="h-8 min-w-0 flex-1 rounded-md border border-line-strong bg-panel px-2.5 font-mono text-[12px] text-ink-2 outline-none" />
+          <input readOnly value={link} onFocus={(e) => e.currentTarget.select()} aria-label="Invite link" className={cx(FIELD, 'flex-1 font-mono text-[12px] text-ink-2')} />
           <Button variant="primary" onClick={() => copyText(link, 'Invite link copied')}>
             <Copy size={14} /> Copy
           </Button>
         </div>
       </div>
-      <p className={cx('flex items-start gap-2 rounded-md px-3 py-2 text-[12.5px]', c.signalingOk === false ? 'bg-warn-soft text-ink' : 'bg-accent-soft text-ink')}>
-        <span className={cx('mt-1 h-2 w-2 shrink-0 rounded-full', c.signalingOk === false ? 'bg-warn' : c.signalingOk ? 'bg-accent' : 'animate-pulse bg-ink-3')} aria-hidden />
-        {c.signalingOk === false
-          ? 'Can’t reach a signalling server, so only tabs in this browser can join. Add a server you can reach when starting the next session.'
-          : c.signalingOk
-            ? 'Connected. Anyone with the link can join while you’re here.'
-            : 'Connecting…'}
+      <p role="status" className={cx('flex items-start gap-2 rounded-md px-3 py-2 text-[12.5px] text-ink', status.tone === 'warn' ? 'bg-warn-soft' : 'bg-accent-soft')}>
+        <span className={cx('mt-1 h-2 w-2 shrink-0 rounded-full', status.tone === 'warn' ? 'bg-warn' : status.tone === 'ok' ? 'bg-accent' : 'animate-pulse bg-ink-3')} aria-hidden />
+        {status.text}
       </p>
       <div className="grid gap-1">
         <span className="text-[12px] font-medium text-ink-2">In this session</span>
@@ -1042,7 +1071,7 @@ function LiveBody({ onClose }: { onClose: () => void }) {
   )
 }
 
-function LiveJoinDialog({ dialog, onClose }: { dialog: { room: string; key: string; signaling: string[] } | null; onClose: () => void }) {
+function LiveJoinDialog({ dialog, onClose }: { dialog: { room: string; key: string; network: Network } | null; onClose: () => void }) {
   const notNow = () => {
     history.replaceState(null, '', location.pathname + location.search)
     onClose()
@@ -1061,7 +1090,7 @@ function LiveJoinDialog({ dialog, onClose }: { dialog: { room: string; key: stri
             variant="primary"
             autoFocus
             onClick={() => {
-              if (dialog) void useCollab.getState().join(dialog.room, dialog.key, dialog.signaling)
+              if (dialog) void useCollab.getState().join(dialog.room, dialog.key, dialog.network)
               onClose()
             }}
           >
