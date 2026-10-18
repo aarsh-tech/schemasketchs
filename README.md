@@ -38,7 +38,7 @@ Planned features are listed in [ROADMAP.md](ROADMAP.md). Contributions are welco
 - **Share links**: the whole schema is compressed into the URL hash, so no server is involved
 - **Embed**: Share → Embed gives an `<iframe>` snippet for docs sites and blogs. `/embed#s=…` shows a read-only diagram you can pan and zoom (hover a table to light up its relationships), in light, dark or the reader's theme, with a link to open a copy. It's a separate small page, so embeds never download the editor
 - **Drag and drop** a file anywhere on the window to open it: `.dbml`, `.sql`, `schema.rb`, `.prisma`, a Drizzle `.ts` file, a project `.json` or a database catalog result `.json`. The format is detected and the right import tab opens
-- **Live collaboration, no server of ours**: start a live session and send the invite link. Everyone edits the same DBML and layout at once, peer to peer over WebRTC (Yjs), with each person's cursor in the editor and their name on the table they're looking at. The link carries the encryption key, so a signalling server only sees encrypted connection setup. Leaving keeps a local copy. Tabs in one browser always connect; across devices you need a signalling server both sides can reach. The public `y-webrtc` servers were down when this was written, so run your own with `pnpm signaling` (it's tiny) and enter its address in the session dialog; the invite link passes it on
+- **Live collaboration, no server of ours**: start a live session and send the invite link. Everyone edits the same DBML and layout at once, peer to peer over WebRTC (Yjs), with each person's cursor in the editor and their name on the table they're looking at. It works between people on different networks with nothing to set up: browsers find each other through several public Nostr relays at once (via Trystero), so one relay being down doesn't matter, and the relays only see connection setup encrypted with the key in the link. Edits are passed on between participants, so two people whose networks can't connect directly still sync through a third. For strict office or mobile networks that block direct connections, add a TURN server under Connection settings; the invite link passes it on. Tabs in one browser connect even offline. Leaving keeps a local copy
 - **Installable and offline**: install Schemasketch as an app from the browser; after the first visit it opens without a connection. The app shell, fonts and parser are cached by a service worker; the large SQL import worker is cached the first time you use it. When a new version is deployed, a toast offers to reload
 - Light and dark themes, works on phones
 
@@ -59,7 +59,6 @@ pnpm preview    # serve the production build locally
 pnpm lint       # oxlint
 pnpm typecheck  # tsc only
 pnpm test       # unit tests (Vitest)
-PORT=4444 pnpm signaling   # a y-webrtc signalling server for live sessions across devices
 ```
 
 ## Deploy to Netlify
@@ -118,7 +117,7 @@ src/
   lib/lint/           schema checks, one file per rule (pure, run after each parse)
   lib/views.ts        views: a named list of tables with its own layout, and the filtered model the canvas draws
   lib/search.ts       fuzzy matching for the command palette, and neighbourhoods for focus mode
-  lib/collab/         live sessions: Yjs doc + y-webrtc + CodeMirror binding (lazy-loaded), invite links
+  lib/collab/         live sessions: Yjs doc + CodeMirror binding, Trystero transport (lazy-loaded), invite links
   lib/seed/           seed data: insert order, keys and constraints, faker values per column (lazy-loaded)
   lib/layoutHistory.ts undo/redo steps for table positions; lib/pdf.ts writes a one-page PDF around a JPEG
   lib/files.ts        File System Access API with download fallbacks, share-link and embed-code encoding

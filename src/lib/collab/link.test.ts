@@ -1,18 +1,34 @@
 import { describe, expect, it } from 'vitest'
-import { initials, liveHash, parseSignaling, randomIdentity, readLiveHash } from './link'
+import { DEFAULT_RELAYS, initials, liveHash, parseRelays, parseTurn, randomIdentity, readLiveHash } from './link'
 
 describe('live links', () => {
   it('round-trips a room and key through the hash', () => {
     const hash = `#${liveHash('Ab3_dEf-12345678', 'k3y_With-Dashes_0123456789')}`
-    expect(readLiveHash(hash)).toEqual({ room: 'Ab3_dEf-12345678', key: 'k3y_With-Dashes_0123456789', signaling: ['wss://signaling.yjs.dev'] })
+    expect(hash).toBe('#live=Ab3_dEf-12345678.k3y_With-Dashes_0123456789')
+    expect(readLiveHash(hash)).toEqual({ room: 'Ab3_dEf-12345678', key: 'k3y_With-Dashes_0123456789', network: { relays: DEFAULT_RELAYS, turn: null } })
   })
 
-  it('carries a non-default signalling server in the link', () => {
-    const hash = liveHash('room12345678', 'key12345678', ['ws://localhost:4444', 'wss://sig.example'])
-    expect(hash).toContain('&sig=')
-    expect(readLiveHash(`#${hash}`)?.signaling).toEqual(['ws://localhost:4444', 'wss://sig.example'])
-    expect(liveHash('room12345678', 'key12345678', ['wss://signaling.yjs.dev'])).not.toContain('sig=')
-    expect(readLiveHash('#live=room12345678.key12345678&sig=%E0%A4%A')?.signaling).toEqual(['wss://signaling.yjs.dev'])
+  it('carries non-default relays in the link', () => {
+    const hash = liveHash('room12345678', 'key12345678', { relays: ['wss://relay.example', 'ws://localhost:7777'], turn: null })
+    expect(hash).toContain('&relays=')
+    expect(readLiveHash(`#${hash}`)?.network.relays).toEqual(['wss://relay.example', 'ws://localhost:7777'])
+    expect(liveHash('room12345678', 'key12345678', { relays: [...DEFAULT_RELAYS], turn: null })).not.toContain('relays=')
+    expect(readLiveHash('#live=room12345678.key12345678&relays=%E0%A4%A')?.network.relays).toEqual(DEFAULT_RELAYS)
+  })
+
+  it('carries a TURN server, with credentials that need escaping', () => {
+    const turn = { url: 'turns:turn.example.com:443?transport=tcp', username: 'ada', credential: 'p&ss=w+rd/ü' }
+    const hash = liveHash('room12345678', 'key12345678', { relays: DEFAULT_RELAYS, turn })
+    expect(readLiveHash(`#${hash}`)?.network).toEqual({ relays: DEFAULT_RELAYS, turn })
+    expect(readLiveHash('#live=room12345678.key12345678&turn=https%3A%2F%2Fnope')?.network.turn).toBeNull()
+  })
+
+  it('still opens links from before relays, ignoring their signalling server', () => {
+    expect(readLiveHash('#live=room12345678.key12345678&sig=ws%3A%2F%2Flocalhost%3A4444')).toEqual({
+      room: 'room12345678',
+      key: 'key12345678',
+      network: { relays: DEFAULT_RELAYS, turn: null },
+    })
   })
 
   it('ignores share links and malformed values', () => {
@@ -38,9 +54,18 @@ describe('identities', () => {
   })
 })
 
-describe('parseSignaling', () => {
+describe('parseRelays', () => {
   it('keeps ws and wss URLs, once each', () => {
-    expect(parseSignaling('wss://a.example\n ws://localhost:4444, https://nope.example wss://a.example')).toEqual(['wss://a.example', 'ws://localhost:4444'])
-    expect(parseSignaling('')).toEqual([])
+    expect(parseRelays('wss://a.example\n ws://localhost:4444, https://nope.example wss://a.example')).toEqual(['wss://a.example', 'ws://localhost:4444'])
+    expect(parseRelays('')).toEqual([])
+  })
+})
+
+describe('parseTurn', () => {
+  it('accepts turn: and turns: URLs only', () => {
+    expect(parseTurn(' turn:turn.example.com:3478 ', ' ada ', ' secret ')).toEqual({ url: 'turn:turn.example.com:3478', username: 'ada', credential: 'secret' })
+    expect(parseTurn('turns:turn.example.com:443', '', '')?.url).toBe('turns:turn.example.com:443')
+    expect(parseTurn('stun:stun.example.com', 'a', 'b')).toBeNull()
+    expect(parseTurn('', 'a', 'b')).toBeNull()
   })
 })

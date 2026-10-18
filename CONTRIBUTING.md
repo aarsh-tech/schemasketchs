@@ -25,7 +25,7 @@ CI runs the same four on every push and pull request.
 Two other scripts are useful:
 
 - `pnpm preview` serves the production build. The service worker (offline support) only registers in a production build, so test PWA changes there.
-- `PORT=4444 pnpm signaling` runs a WebRTC signalling server, for testing live sessions between two browsers.
+- Live sessions connect through public Nostr relays, so to test one between two browsers, open the invite link in a second browser profile (tabs in one profile also connect, over a BroadcastChannel).
 
 ## How the code fits together
 

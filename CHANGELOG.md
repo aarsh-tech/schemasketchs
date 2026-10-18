@@ -54,3 +54,7 @@ To keep the embed small, the plain table, note and group views moved to `canvas/
 
 ## Housekeeping
 The README opens with a demo GIF (typing DBML into an empty schema while the diagram draws itself) and light and dark screenshots, in `docs/`. Added CONTRIBUTING.md (setup, architecture rules, UI conventions, testing and pull request expectations), bug and feature issue forms, and a pull request checklist.
+
+## Live sessions across networks
+The public y-webrtc signalling servers had shut down, so live sessions only connected tabs in one browser. Browsers now find each other through eight public Nostr relays at once via Trystero, with the connection setup encrypted by the link's key; a small Yjs provider (`lib/collab/transport.ts`) syncs over the WebRTC data channels and passes edits on, so people who can't connect directly still sync through a third, and tabs in one browser still connect offline over a BroadcastChannel.
+Connection settings take custom relays and an optional TURN server for strict networks, both carried in the invite link; the dialog says how many relays are reachable and when a direct connection was blocked. `y-webrtc` and `pnpm signaling` are gone; old invite links still open. Tested with two separate Chrome profiles over the public relays: joined in about 4 seconds, text synced both ways, and leaving showed up at once.

@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { CodeFormat } from '@/lib/actions'
+import type { Network } from '@/lib/collab/link'
 import type { ProjectFile } from '@/lib/files'
 
 export type ImportFormat = 'sql' | 'prisma' | 'drizzle' | 'database'
@@ -21,7 +22,7 @@ export type DialogState =
   | { type: 'live' }
   | { type: 'seed' }
   /** someone opened a live session link */
-  | { type: 'live-join'; room: string; key: string; signaling: string[] }
+  | { type: 'live-join'; room: string; key: string; network: Network }
   | null
 
 export const useDialogs = create<{ dialog: DialogState; open: (d: DialogState) => void; close: () => void }>((set) => ({

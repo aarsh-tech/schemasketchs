@@ -16,8 +16,7 @@
     "typecheck": "tsc -b",
     "lint": "oxlint",
     "test": "vitest run",
-    "test:watch": "vitest",
-    "signaling": "node node_modules/y-webrtc/bin/server.js"
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.3",
@@ -38,6 +37,7 @@
     "elkjs": "^0.12.0",
     "html-to-image": "^1.11.13",
     "idb-keyval": "6.2.2",
+    "lib0": "0.2.119",
     "lucide-react": "^1.59.0",
     "lz-string": "^1.5.0",
     "nanoid": "^6.0.2",
@@ -45,9 +45,9 @@
     "react-dom": "^19.2.8",
     "react-resizable-panels": "^4.14.5",
     "sonner": "^2.0.8",
+    "trystero": "0.25.4",
     "y-codemirror.next": "0.3.6",
     "y-protocols": "1.0.7",
-    "y-webrtc": "10.3.0",
     "yjs": "13.6.33",
     "zustand": "^5.0.15"
   },
